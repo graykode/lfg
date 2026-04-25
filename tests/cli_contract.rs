@@ -55,6 +55,26 @@ fn run_lfg_with_registry_now_and_env(
     command.output().expect("run lfg binary")
 }
 
+fn run_lfg_with_pypi_registry_now_and_env(
+    args: &[&str],
+    registry_base_url: &str,
+    now_unix_seconds: u64,
+    envs: &[(&str, String)],
+) -> std::process::Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lfg"));
+    command
+        .args(args)
+        .env("LFG_PYPI_REGISTRY_URL", registry_base_url)
+        .env("LFG_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
+        .env("LFG_REVIEW_PROVIDER", "none");
+
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+
+    command.output().expect("run lfg binary")
+}
+
 fn run_program_with_registry_now_and_env(
     program: &Path,
     args: &[&str],
@@ -97,6 +117,36 @@ fn write_fake_npm_bin(dir: &Path) {
         .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(npm_path, permissions).expect("mark fake npm executable");
+}
+
+fn write_fake_pip_bin(dir: &Path) {
+    fs::create_dir_all(dir).expect("create fake bin dir");
+    let pip_path = dir.join("pip");
+    fs::write(
+        &pip_path,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LFG_FAKE_PIP_ARGS\"\nprintf 'fake pip stdout\\n'\nprintf 'fake pip stderr\\n' >&2\n",
+    )
+    .expect("write fake pip");
+    let mut permissions = fs::metadata(&pip_path)
+        .expect("read fake pip metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(pip_path, permissions).expect("mark fake pip executable");
+}
+
+fn write_fake_uv_bin(dir: &Path) {
+    fs::create_dir_all(dir).expect("create fake bin dir");
+    let uv_path = dir.join("uv");
+    fs::write(
+        &uv_path,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LFG_FAKE_UV_ARGS\"\nprintf 'fake uv stdout\\n'\nprintf 'fake uv stderr\\n' >&2\n",
+    )
+    .expect("write fake uv");
+    let mut permissions = fs::metadata(&uv_path)
+        .expect("read fake uv metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(uv_path, permissions).expect("mark fake uv executable");
 }
 
 fn write_lfg_shim(dir: &Path, name: &str) -> PathBuf {
@@ -159,6 +209,67 @@ fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<
     });
 
     (format!("http://{address}"), handle)
+}
+
+fn serve_json_paths_once(
+    responses: BTreeMap<String, String>,
+) -> (String, thread::JoinHandle<Vec<String>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    listener
+        .set_nonblocking(true)
+        .expect("configure nonblocking listener");
+    let address = listener.local_addr().expect("read local server address");
+    let registry_base_url = format!("http://{address}");
+    let expected_request_count = responses.len();
+
+    let handle = thread::spawn(move || {
+        let mut requests = Vec::new();
+        let started_at = Instant::now();
+
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream
+                        .set_nonblocking(false)
+                        .expect("configure blocking stream");
+                    let mut buffer = [0; 2048];
+                    let read = stream.read(&mut buffer).expect("read request");
+                    let request = String::from_utf8_lossy(&buffer[..read]).to_string();
+                    let path = request
+                        .lines()
+                        .next()
+                        .and_then(|line| line.split_whitespace().nth(1))
+                        .expect("request path")
+                        .to_owned();
+                    let body = responses
+                        .get(&path)
+                        .unwrap_or_else(|| panic!("unexpected request path: {path}"));
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    stream
+                        .write_all(response.as_bytes())
+                        .expect("write response");
+                    requests.push(request);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    if requests.len() >= expected_request_count
+                        || started_at.elapsed() > Duration::from_secs(2)
+                    {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("accept request: {error}"),
+            }
+        }
+
+        requests
+    });
+
+    (registry_base_url, handle)
 }
 
 fn tgz(entries: &[(&str, &str)]) -> Vec<u8> {
@@ -789,4 +900,217 @@ fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
     assert!(request.starts_with("GET /old-package HTTP/1.1\r\n"));
 
     fs::remove_dir_all(temp_dir).expect("remove fake npm temp dir");
+}
+
+#[test]
+fn explicit_old_pip_install_executes_real_pip_after_policy_pass() {
+    let project = r#"{
+      "info": { "name": "old-python-package", "version": "1.1.0" },
+      "releases": {
+        "1.0.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/old-python-package-1.0.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+          }
+        ],
+        "1.1.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/old-python-package-1.1.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+          }
+        ]
+      }
+    }"#;
+    let (registry_base_url, server) = serve_packument_once(project);
+    let temp_dir = temp_test_dir("lfg-fake-pip");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("pip-args.txt");
+    write_fake_pip_bin(&fake_bin_dir);
+
+    let output = run_lfg_with_pypi_registry_now_and_env(
+        &["pip", "install", "old-python-package"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_PIP_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake pip stdout\n"
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert_eq!(stderr, "fake pip stderr\n");
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake pip args are captured"),
+        "install\nold-python-package\n"
+    );
+
+    let request = server.join().expect("server thread completes");
+    assert!(request.starts_with("GET /pypi/old-python-package/json HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove fake pip temp dir");
+}
+
+#[test]
+fn explicit_old_pip_requirements_install_executes_real_pip_after_policy_pass() {
+    let first_project = r#"{
+      "info": { "name": "first-python-package", "version": "1.1.0" },
+      "releases": {
+        "1.0.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/first-python-package-1.0.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+          }
+        ],
+        "1.1.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/first-python-package-1.1.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+          }
+        ]
+      }
+    }"#;
+    let second_project = r#"{
+      "info": { "name": "second-python-package", "version": "2.0.0" },
+      "releases": {
+        "1.0.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/second-python-package-1.0.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+          }
+        ],
+        "2.0.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/second-python-package-2.0.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+          }
+        ]
+      }
+    }"#;
+    let (registry_base_url, server) = serve_json_paths_once(BTreeMap::from([
+        (
+            "/pypi/first-python-package/json".to_owned(),
+            first_project.to_owned(),
+        ),
+        (
+            "/pypi/second-python-package/json".to_owned(),
+            second_project.to_owned(),
+        ),
+    ]));
+    let temp_dir = temp_test_dir("lfg-fake-pip-requirements");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("pip-args.txt");
+    let requirements_path = temp_dir.join("requirements.txt");
+    fs::create_dir_all(&temp_dir).expect("create temp dir");
+    fs::write(
+        &requirements_path,
+        "first-python-package\nsecond-python-package==2.0.0\n",
+    )
+    .expect("write requirements file");
+    write_fake_pip_bin(&fake_bin_dir);
+
+    let output = run_lfg_with_pypi_registry_now_and_env(
+        &["pip", "install", "-r", &requirements_path.to_string_lossy()],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_PIP_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake pip stdout\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake pip args are captured"),
+        format!("install\n-r\n{}\n", requirements_path.display())
+    );
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 2);
+    assert!(requests
+        .iter()
+        .any(|request| request.starts_with("GET /pypi/first-python-package/json HTTP/1.1\r\n")));
+    assert!(requests
+        .iter()
+        .any(|request| request.starts_with("GET /pypi/second-python-package/json HTTP/1.1\r\n")));
+
+    fs::remove_dir_all(temp_dir).expect("remove fake pip requirements temp dir");
+}
+
+#[test]
+fn explicit_old_uv_add_executes_real_uv_after_policy_pass() {
+    let project = r#"{
+      "info": { "name": "old-python-package", "version": "1.1.0" },
+      "releases": {
+        "1.0.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/old-python-package-1.0.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+          }
+        ],
+        "1.1.0": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/old-python-package-1.1.0.tar.gz",
+            "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+          }
+        ]
+      }
+    }"#;
+    let (registry_base_url, server) = serve_packument_once(project);
+    let temp_dir = temp_test_dir("lfg-fake-uv");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("uv-args.txt");
+    write_fake_uv_bin(&fake_bin_dir);
+
+    let output = run_lfg_with_pypi_registry_now_and_env(
+        &["uv", "add", "old-python-package"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_UV_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake uv stdout\n"
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert_eq!(stderr, "fake uv stderr\n");
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake uv args are captured"),
+        "add\nold-python-package\n"
+    );
+
+    let request = server.join().expect("server thread completes");
+    assert!(request.starts_with("GET /pypi/old-python-package/json HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove fake uv temp dir");
 }

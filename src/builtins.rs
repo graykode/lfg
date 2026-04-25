@@ -5,9 +5,14 @@ use std::time::Duration;
 use crate::core::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
 use crate::core::{Registry, RegistryError};
 use crate::core::{ReleaseDecisionEvaluator, ReviewPolicy};
+use crate::ecosystems::pypi::{
+    PypiHttpProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
+};
 use crate::managers::npm::NpmManagerAdapter;
 use crate::managers::npm::NpmReleaseDecisionEvaluator;
 use crate::managers::npm::{NpmHttpPackumentClient, NpmRegistryResolver};
+use crate::managers::pip::PipManagerAdapter;
+use crate::managers::uv::UvManagerAdapter;
 use crate::providers::{CommandReviewProvider, ReviewProvider, UnavailableReviewProvider};
 
 pub type ManagerAdapterRegistry = Registry<Box<dyn ManagerIntegrationAdapter>>;
@@ -17,6 +22,7 @@ pub type ReleaseDecisionEvaluatorRegistry<'a> = Registry<Box<dyn ReleaseDecision
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdapterConfig {
     pub npm_registry_base_url: String,
+    pub pypi_registry_base_url: String,
 }
 
 impl AdapterConfig {
@@ -24,6 +30,8 @@ impl AdapterConfig {
         Self {
             npm_registry_base_url: env::var("LFG_NPM_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://registry.npmjs.org".to_owned()),
+            pypi_registry_base_url: env::var("LFG_PYPI_REGISTRY_URL")
+                .unwrap_or_else(|_| "https://pypi.org".to_owned()),
         }
     }
 }
@@ -129,6 +137,16 @@ pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryErr
 
     registry.register(id, adapter)?;
 
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(PipManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(UvManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
     Ok(registry)
 }
 
@@ -138,6 +156,12 @@ pub fn built_in_release_decision_evaluators<'a>(
     let mut registry = Registry::new();
     let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
         Box::new(NpmReleaseDecisionEvaluator::new(policy));
+    let id = evaluator.id();
+
+    registry.register(id, evaluator)?;
+
+    let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
+        Box::new(PythonReleaseDecisionEvaluator::new(policy));
     let id = evaluator.id();
 
     registry.register(id, evaluator)?;
@@ -220,6 +244,13 @@ pub fn built_in_release_resolvers(
     let mut registry = Registry::new();
     let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(NpmRegistryResolver::new(
         NpmHttpPackumentClient::new(config.npm_registry_base_url),
+    ));
+    let id = resolver.id();
+
+    registry.register(id, resolver)?;
+
+    let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(PypiRegistryResolver::new(
+        PypiHttpProjectClient::new(config.pypi_registry_base_url),
     ));
     let id = resolver.id();
 

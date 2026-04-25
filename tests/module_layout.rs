@@ -4,6 +4,9 @@ use lfg::core::{
     PackageManager, PackageOutcome, Registry, ReleaseDecisionEvaluator, ReleaseReviewer,
     SkipReason, UnavailableReleaseReviewer, Verdict,
 };
+use lfg::ecosystems::pypi::{
+    PypiHttpProjectClient, PypiProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
+};
 use lfg::evidence::{
     read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
     UnifiedDiffEngine,
@@ -12,6 +15,8 @@ use lfg::managers::npm::{
     evaluate_npm_install_request, NpmManagerAdapter, NpmPackumentClient, NpmRegistryResolver,
     NpmReleaseDecisionEvaluator,
 };
+use lfg::managers::pip::PipManagerAdapter;
+use lfg::managers::uv::UvManagerAdapter;
 use lfg::providers::{
     parse_provider_output, ArchiveDiffReviewer, CommandReviewProvider, DiffReviewPromptBuilder,
     ProviderError, ReviewPrompt, ReviewProvider, UnavailableReviewProvider,
@@ -58,6 +63,11 @@ fn public_modules_are_grouped_by_role() {
     let _ = <HttpArchiveFetcher as ArchiveFetcher>::fetch;
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
+    let _ = PipManagerAdapter;
+    let _ = UvManagerAdapter;
+    let _ = PypiRegistryResolver::<NeverProjectClient>::new;
+    let _ = PypiHttpProjectClient::new("https://pypi.org");
+    let _ = PythonReleaseDecisionEvaluator::new;
     let _ = ArchiveDiffReviewer::<HttpArchiveFetcher, UnifiedDiffEngine>::new;
     let _ = CommandReviewProvider::new("demo", "true", Vec::<String>::new());
     let _ = DiffReviewPromptBuilder;
@@ -87,6 +97,17 @@ impl NpmPackumentClient for NeverPackumentClient {
         _package_name: &str,
     ) -> Result<String, lfg::managers::npm::NpmFetchError> {
         unreachable!("module layout test does not fetch packuments")
+    }
+}
+
+struct NeverProjectClient;
+
+impl PypiProjectClient for NeverProjectClient {
+    fn fetch_project(
+        &self,
+        _package_name: &str,
+    ) -> Result<String, lfg::ecosystems::pypi::PypiFetchError> {
+        unreachable!("module layout test does not fetch PyPI projects")
     }
 }
 

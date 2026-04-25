@@ -1,10 +1,13 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageManager {
     Npm,
+    Pip,
+    Uv,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallOperation {
+    Add,
     Install,
 }
 

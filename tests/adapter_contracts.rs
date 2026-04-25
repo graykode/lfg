@@ -3,8 +3,11 @@ use lfg::core::{
     ResolveError, ResolvedPackageRelease, ResolvedPackageReleases,
 };
 use lfg::core::{InstallOperation, InstallTarget, PackageManager};
+use lfg::ecosystems::pypi::{PypiFetchError, PypiProjectClient, PypiRegistryResolver};
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
+use lfg::managers::pip::PipManagerAdapter;
+use lfg::managers::uv::UvManagerAdapter;
 
 struct StaticPackumentClient;
 
@@ -28,6 +31,37 @@ impl NpmPackumentClient for StaticPackumentClient {
             "1.1.0": {
               "dist": { "tarball": "https://registry.npmjs.org/left-pad/-/left-pad-1.1.0.tgz" }
             }
+          }
+        }"#
+        .to_owned())
+    }
+}
+
+struct StaticProjectClient;
+
+impl PypiProjectClient for StaticProjectClient {
+    fn fetch_project(&self, package_name: &str) -> Result<String, PypiFetchError> {
+        if package_name != "requests" {
+            return Err(PypiFetchError::Unavailable(package_name.to_owned()));
+        }
+
+        Ok(r#"{
+          "info": { "name": "requests", "version": "2.32.3" },
+          "releases": {
+            "2.32.2": [
+              {
+                "packagetype": "sdist",
+                "url": "https://files.pythonhosted.org/packages/requests-2.32.2.tar.gz",
+                "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+              }
+            ],
+            "2.32.3": [
+              {
+                "packagetype": "sdist",
+                "url": "https://files.pythonhosted.org/packages/requests-2.32.3.tar.gz",
+                "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+              }
+            ]
           }
         }"#
         .to_owned())
@@ -69,6 +103,54 @@ fn npm_manager_adapter_uses_common_parse_errors() {
 }
 
 #[test]
+fn pip_manager_adapter_implements_common_contract() {
+    let adapter = PipManagerAdapter;
+
+    let request = adapter
+        .parse_install(&["install".to_owned(), "requests".to_owned()])
+        .expect("pip install should parse");
+
+    assert_eq!(adapter.id(), "pip");
+    assert_eq!(adapter.release_resolver_id(), "pypi-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "python-release-policy"
+    );
+    assert_eq!(request.manager, PackageManager::Pip);
+    assert_eq!(request.operation, InstallOperation::Install);
+    assert_eq!(
+        request.targets,
+        vec![InstallTarget {
+            spec: "requests".to_owned()
+        }]
+    );
+}
+
+#[test]
+fn uv_manager_adapter_implements_common_contract() {
+    let adapter = UvManagerAdapter;
+
+    let request = adapter
+        .parse_install(&["add".to_owned(), "requests".to_owned()])
+        .expect("uv add should parse");
+
+    assert_eq!(adapter.id(), "uv");
+    assert_eq!(adapter.release_resolver_id(), "pypi-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "python-release-policy"
+    );
+    assert_eq!(request.manager, PackageManager::Uv);
+    assert_eq!(request.operation, InstallOperation::Add);
+    assert_eq!(
+        request.targets,
+        vec![InstallTarget {
+            spec: "requests".to_owned()
+        }]
+    );
+}
+
+#[test]
 fn npm_registry_resolver_implements_common_contract() {
     let resolver = NpmRegistryResolver::new(StaticPackumentClient);
 
@@ -100,6 +182,49 @@ fn npm_registry_resolver_implements_common_contract() {
 #[test]
 fn npm_registry_resolver_maps_fetch_failures_to_common_resolve_error() {
     let resolver = NpmRegistryResolver::new(StaticPackumentClient);
+
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "missing".to_owned()
+        }),
+        Err(ResolveError::RegistryUnavailable("missing".to_owned()))
+    );
+}
+
+#[test]
+fn pypi_registry_resolver_implements_common_contract() {
+    let resolver = PypiRegistryResolver::new(StaticProjectClient);
+
+    assert_eq!(resolver.id(), "pypi-registry");
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "requests".to_owned()
+        }),
+        Ok(ResolvedPackageReleases {
+            package_name: "requests".to_owned(),
+            target: ResolvedPackageRelease {
+                version: "2.32.3".to_owned(),
+                published_at: "1970-01-02T00:00:00.000000Z".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://files.pythonhosted.org/packages/requests-2.32.3.tar.gz"
+                        .to_owned()
+                },
+            },
+            previous: ResolvedPackageRelease {
+                version: "2.32.2".to_owned(),
+                published_at: "1970-01-01T00:00:00.000000Z".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://files.pythonhosted.org/packages/requests-2.32.2.tar.gz"
+                        .to_owned()
+                },
+            },
+        })
+    );
+}
+
+#[test]
+fn pypi_registry_resolver_maps_fetch_failures_to_common_resolve_error() {
+    let resolver = PypiRegistryResolver::new(StaticProjectClient);
 
     assert_eq!(
         resolver.resolve(&InstallTarget {

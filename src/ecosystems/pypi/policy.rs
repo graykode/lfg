@@ -6,19 +6,19 @@ use crate::core::{ReleaseDecisionError, ReleaseDecisionEvaluator};
 use crate::core::{ReviewDecision, ReviewPolicy};
 
 #[derive(Debug, Clone, Copy)]
-pub struct NpmReleaseDecisionEvaluator<'a> {
+pub struct PythonReleaseDecisionEvaluator<'a> {
     policy: &'a ReviewPolicy,
 }
 
-impl<'a> NpmReleaseDecisionEvaluator<'a> {
+impl<'a> PythonReleaseDecisionEvaluator<'a> {
     pub const fn new(policy: &'a ReviewPolicy) -> Self {
         Self { policy }
     }
 }
 
-impl ReleaseDecisionEvaluator for NpmReleaseDecisionEvaluator<'_> {
+impl ReleaseDecisionEvaluator for PythonReleaseDecisionEvaluator<'_> {
     fn id(&self) -> &'static str {
-        "npm-release-policy"
+        "python-release-policy"
     }
 
     fn decide(

@@ -12,6 +12,10 @@ pub trait ManagerIntegrationAdapter {
 pub enum ManagerAdapterError {
     MissingCommand,
     MissingPackage,
+    MissingRequirementsFile,
+    RequirementsFileUnavailable(String),
+    UnsupportedManagerOption(String),
+    UnsupportedRequirement(String),
     UnsupportedCommand(String),
 }
 

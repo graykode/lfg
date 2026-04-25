@@ -432,6 +432,32 @@ fn manager_parse_error_response(manager_id: &str, error: ManagerAdapterError) ->
             stdout: String::new(),
             stderr: format!("lfg: {manager_id} install needs at least one package\n"),
         },
+        ManagerAdapterError::MissingRequirementsFile => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: format!("lfg: {manager_id} requirements file path is required\n"),
+        },
+        ManagerAdapterError::RequirementsFileUnavailable(path) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "lfg: {manager_id} requirements file is unavailable: {path}; install is paused.\n"
+            ),
+        },
+        ManagerAdapterError::UnsupportedManagerOption(option) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "lfg: {manager_id} option cannot be reviewed safely: {option}; install is paused.\n"
+            ),
+        },
+        ManagerAdapterError::UnsupportedRequirement(requirement) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "lfg: {manager_id} requirement cannot be reviewed safely: {requirement}; install is paused.\n"
+            ),
+        },
         ManagerAdapterError::UnsupportedCommand(command) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
@@ -510,6 +536,7 @@ fn cli_result(
 
 fn operation_label(operation: InstallOperation) -> &'static str {
     match operation {
+        InstallOperation::Add => "add",
         InstallOperation::Install => "install",
     }
 }
@@ -585,6 +612,8 @@ Options:
 
 Examples:
   lfg npm install <package>
+  lfg pip install -r requirements.txt
+  lfg uv add <package>
   lfg shim install --dir ~/.local/bin npm
 "
     .to_owned()
@@ -630,6 +659,25 @@ mod tests {
         assert_eq!(
             response.stderr,
             "lfg: npm install needs at least one package\n"
+        );
+    }
+
+    #[test]
+    fn unsupported_manager_option_pauses_install() {
+        let response = run([
+            "lfg".to_owned(),
+            "pip".to_owned(),
+            "install".to_owned(),
+            "--index-url".to_owned(),
+            "https://example.invalid/simple".to_owned(),
+            "requests".to_owned(),
+        ]);
+
+        assert_eq!(response.exit_code, 20);
+        assert!(response.stdout.is_empty());
+        assert_eq!(
+            response.stderr,
+            "lfg: pip option cannot be reviewed safely: --index-url; install is paused.\n"
         );
     }
 

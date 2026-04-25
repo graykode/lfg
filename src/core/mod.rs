@@ -5,6 +5,7 @@ pub mod install_request;
 pub mod outcome;
 pub mod policy;
 pub mod registry;
+pub mod release_age;
 pub mod verdict;
 
 pub use contracts::*;
@@ -14,4 +15,5 @@ pub use install_request::*;
 pub use outcome::*;
 pub use policy::*;
 pub use registry::*;
+pub use release_age::*;
 pub use verdict::*;

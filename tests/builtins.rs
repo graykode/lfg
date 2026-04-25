@@ -11,7 +11,7 @@ use lfg::builtins::{
 use lfg::core::{InstallTarget, ReviewPolicy};
 use lfg::providers::ReviewProvider;
 
-fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<String>) {
+fn serve_json_once(body: &'static str) -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
     let address = listener.local_addr().expect("read local server address");
     let handle = thread::spawn(move || {
@@ -21,8 +21,8 @@ fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<
         let request = String::from_utf8_lossy(&buffer[..read]).to_string();
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-            packument.len(),
-            packument
+            body.len(),
+            body
         );
         stream
             .write_all(response.as_bytes())
@@ -34,10 +34,10 @@ fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<
 }
 
 #[test]
-fn built_in_manager_registry_contains_npm_adapter() {
+fn built_in_manager_registry_contains_manager_adapters() {
     let registry = built_in_manager_adapters().expect("built-in manager adapters register");
 
-    assert_eq!(registry.available_ids(), vec!["npm"]);
+    assert_eq!(registry.available_ids(), vec!["npm", "pip", "uv"]);
 
     let adapter = registry.get("npm").expect("npm manager adapter");
     assert_eq!(adapter.id(), "npm");
@@ -51,10 +51,36 @@ fn built_in_manager_registry_contains_npm_adapter() {
         .parse_install(&["install".to_owned(), "left-pad".to_owned()])
         .expect("parse npm install");
     assert_eq!(request.targets[0].spec, "left-pad");
+
+    let adapter = registry.get("pip").expect("pip manager adapter");
+    assert_eq!(adapter.id(), "pip");
+    assert_eq!(adapter.release_resolver_id(), "pypi-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "python-release-policy"
+    );
+
+    let request = adapter
+        .parse_install(&["install".to_owned(), "requests".to_owned()])
+        .expect("parse pip install");
+    assert_eq!(request.targets[0].spec, "requests");
+
+    let adapter = registry.get("uv").expect("uv manager adapter");
+    assert_eq!(adapter.id(), "uv");
+    assert_eq!(adapter.release_resolver_id(), "pypi-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "python-release-policy"
+    );
+
+    let request = adapter
+        .parse_install(&["add".to_owned(), "requests".to_owned()])
+        .expect("parse uv add");
+    assert_eq!(request.targets[0].spec, "requests");
 }
 
 #[test]
-fn built_in_release_resolver_registry_contains_configured_npm_registry_resolver() {
+fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() {
     let packument = r#"{
       "name": "left-pad",
       "dist-tags": { "latest": "1.1.0" },
@@ -71,13 +97,37 @@ fn built_in_release_resolver_registry_contains_configured_npm_registry_resolver(
         }
       }
     }"#;
-    let (registry_base_url, server) = serve_packument_once(packument);
+    let project = r#"{
+      "info": { "name": "requests", "version": "2.32.3" },
+      "releases": {
+        "2.32.2": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/requests-2.32.2.tar.gz",
+            "upload_time_iso_8601": "1970-01-01T00:00:00.000000Z"
+          }
+        ],
+        "2.32.3": [
+          {
+            "packagetype": "sdist",
+            "url": "https://files.pythonhosted.org/packages/requests-2.32.3.tar.gz",
+            "upload_time_iso_8601": "1970-01-02T00:00:00.000000Z"
+          }
+        ]
+      }
+    }"#;
+    let (npm_registry_base_url, npm_server) = serve_json_once(packument);
+    let (pypi_registry_base_url, pypi_server) = serve_json_once(project);
     let registry = built_in_release_resolvers(AdapterConfig {
-        npm_registry_base_url: registry_base_url,
+        npm_registry_base_url,
+        pypi_registry_base_url,
     })
     .expect("built-in release resolvers register");
 
-    assert_eq!(registry.available_ids(), vec!["npm-registry"]);
+    assert_eq!(
+        registry.available_ids(),
+        vec!["npm-registry", "pypi-registry"]
+    );
 
     let resolver = registry.get("npm-registry").expect("npm registry resolver");
     assert_eq!(resolver.id(), "npm-registry");
@@ -92,22 +142,47 @@ fn built_in_release_resolver_registry_contains_configured_npm_registry_resolver(
     assert_eq!(releases.target.version, "1.1.0");
     assert_eq!(releases.previous.version, "1.0.0");
 
-    let request = server.join().expect("server thread completes");
+    let resolver = registry
+        .get("pypi-registry")
+        .expect("pypi registry resolver");
+    assert_eq!(resolver.id(), "pypi-registry");
+
+    let releases = resolver
+        .resolve(&InstallTarget {
+            spec: "requests".to_owned(),
+        })
+        .expect("resolve pypi release");
+
+    assert_eq!(releases.package_name, "requests");
+    assert_eq!(releases.target.version, "2.32.3");
+    assert_eq!(releases.previous.version, "2.32.2");
+
+    let request = npm_server.join().expect("npm server thread completes");
     assert!(request.starts_with("GET /left-pad HTTP/1.1\r\n"));
+    let request = pypi_server.join().expect("pypi server thread completes");
+    assert!(request.starts_with("GET /pypi/requests/json HTTP/1.1\r\n"));
 }
 
 #[test]
-fn built_in_release_decision_evaluator_registry_contains_npm_policy() {
+fn built_in_release_decision_evaluator_registry_contains_release_policies() {
     let policy = ReviewPolicy::default();
     let registry =
         built_in_release_decision_evaluators(&policy).expect("built-in evaluators register");
 
-    assert_eq!(registry.available_ids(), vec!["npm-release-policy"]);
+    assert_eq!(
+        registry.available_ids(),
+        vec!["npm-release-policy", "python-release-policy"]
+    );
 
     let evaluator = registry
         .get("npm-release-policy")
         .expect("npm release decision evaluator");
     assert_eq!(evaluator.id(), "npm-release-policy");
+
+    let evaluator = registry
+        .get("python-release-policy")
+        .expect("python release decision evaluator");
+    assert_eq!(evaluator.id(), "python-release-policy");
 }
 
 #[derive(Debug, Clone, Copy)]

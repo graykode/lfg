@@ -66,15 +66,19 @@ The Rust code is grouped by role:
 ```text
 src/
   core/              shared contracts, policy, verdicts, outcomes, assessment flow
+  ecosystems/pypi/   PyPI registry metadata and Python release policy glue
   evidence/          archive reading, archive fetching, source diff creation
   managers/npm/      npm CLI parsing, npm registry metadata, npm policy glue
+  managers/pip/      pip CLI parsing
+  managers/uv/       uv CLI parsing
   providers/         provider output parsing and future provider adapters
   builtins.rs        built-in adapter registry wiring
   cli.rs             CLI entrypoint behavior
 ```
 
 Start in `core/install_assessment.rs` for the manager-neutral assessment flow.
-Look in `managers/npm/` only for npm-specific parsing and metadata code.
+Look in `managers/` for package-manager CLI parsing, and in `ecosystems/`
+for registry-specific metadata resolution shared by managers.
 
 ## Command Shim
 
