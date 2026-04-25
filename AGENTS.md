@@ -15,11 +15,11 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Work on **Milestone 3: Python Ecosystem**.
+Work on **Milestone 4: Adapter Protocol**.
 
-Keep pip and uv manager adapters thin. Share PyPI release resolution
-between them, and keep diff, policy, provider, verdict, shim, and
-execution behavior in the existing manager-neutral paths.
+Do not move core install assessment, policy, diff, provider, verdict, shim,
+or execution behavior into plugins. External adapters should describe the
+same logical contracts that built-in adapters already use.
 
 ## Non-Negotiables
 
