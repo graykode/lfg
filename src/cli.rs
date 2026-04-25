@@ -612,9 +612,11 @@ Options:
 
 Examples:
   lfg npm install <package>
+  lfg pnpm add <package>
+  lfg yarn add <package>
   lfg pip install -r requirements.txt
   lfg uv add <package>
-  lfg shim install --dir ~/.local/bin npm
+  lfg shim install --dir ~/.local/bin pnpm
 "
     .to_owned()
 }

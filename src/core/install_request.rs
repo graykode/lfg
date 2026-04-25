@@ -2,7 +2,9 @@
 pub enum PackageManager {
     Npm,
     Pip,
+    Pnpm,
     Uv,
+    Yarn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -17,7 +17,9 @@ use lfg::evidence::{
 };
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
+use lfg::managers::pnpm::PnpmManagerAdapter;
 use lfg::managers::uv::UvManagerAdapter;
+use lfg::managers::yarn::YarnManagerAdapter;
 use lfg::providers::{
     parse_provider_output, ArchiveDiffReviewer, CommandReviewProvider, DiffReviewPromptBuilder,
     ProviderError, ReviewPrompt, ReviewProvider, UnavailableReviewProvider,
@@ -64,8 +66,10 @@ fn public_modules_are_grouped_by_role() {
     let _ = <HttpArchiveFetcher as ArchiveFetcher>::fetch;
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
+    let _ = PnpmManagerAdapter;
     let _ = PipManagerAdapter;
     let _ = UvManagerAdapter;
+    let _ = YarnManagerAdapter;
     let _ = PypiRegistryResolver::<NeverProjectClient>::new;
     let _ = PypiHttpProjectClient::new("https://pypi.org");
     let _ = PythonReleaseDecisionEvaluator::new;

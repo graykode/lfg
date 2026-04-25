@@ -1,0 +1,68 @@
+use lfg::core::{
+    InstallOperation, InstallRequest, InstallTarget, ManagerAdapterError,
+    ManagerIntegrationAdapter, PackageManager,
+};
+use lfg::managers::yarn::YarnManagerAdapter;
+
+fn args(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_owned()).collect()
+}
+
+#[test]
+fn parses_yarn_add_package() {
+    assert_eq!(
+        YarnManagerAdapter.parse_install(&args(&["add", "left-pad"])),
+        Ok(InstallRequest {
+            manager: PackageManager::Yarn,
+            operation: InstallOperation::Add,
+            targets: vec![InstallTarget {
+                spec: "left-pad".to_owned()
+            }],
+            manager_args: args(&["add", "left-pad"]),
+        })
+    );
+}
+
+#[test]
+fn builds_real_yarn_command_from_original_args() {
+    let request = YarnManagerAdapter
+        .parse_install(&args(&["add", "--dev", "left-pad"]))
+        .expect("yarn add should parse");
+    let command = YarnManagerAdapter.real_command(&request);
+
+    assert_eq!(command.program, "yarn");
+    assert_eq!(command.args, args(&["add", "--dev", "left-pad"]));
+}
+
+#[test]
+fn asks_on_resolution_affecting_yarn_option() {
+    assert_eq!(
+        YarnManagerAdapter.parse_install(&args(&[
+            "add",
+            "--registry",
+            "https://example.invalid",
+            "left-pad"
+        ])),
+        Err(ManagerAdapterError::UnsupportedManagerOption(
+            "--registry".to_owned()
+        ))
+    );
+}
+
+#[test]
+fn rejects_yarn_add_without_package() {
+    assert_eq!(
+        YarnManagerAdapter.parse_install(&args(&["add"])),
+        Err(ManagerAdapterError::MissingPackage)
+    );
+}
+
+#[test]
+fn rejects_unsupported_yarn_command() {
+    assert_eq!(
+        YarnManagerAdapter.parse_install(&args(&["install"])),
+        Err(ManagerAdapterError::UnsupportedCommand(
+            "install".to_owned()
+        ))
+    );
+}

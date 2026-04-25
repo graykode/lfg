@@ -71,7 +71,9 @@ src/
   evidence/          archive reading, archive fetching, source diff creation
   managers/npm/      npm CLI parsing
   managers/pip/      pip CLI parsing
+  managers/pnpm/     pnpm CLI parsing
   managers/uv/       uv CLI parsing
+  managers/yarn/     Yarn CLI parsing
   providers/         provider output parsing and future provider adapters
   builtins.rs        built-in adapter registry wiring
   cli.rs             CLI entrypoint behavior

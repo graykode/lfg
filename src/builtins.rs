@@ -13,7 +13,9 @@ use crate::ecosystems::pypi::{
 };
 use crate::managers::npm::NpmManagerAdapter;
 use crate::managers::pip::PipManagerAdapter;
+use crate::managers::pnpm::PnpmManagerAdapter;
 use crate::managers::uv::UvManagerAdapter;
+use crate::managers::yarn::YarnManagerAdapter;
 use crate::providers::{CommandReviewProvider, ReviewProvider, UnavailableReviewProvider};
 
 pub type ManagerAdapterRegistry = Registry<Box<dyn ManagerIntegrationAdapter>>;
@@ -143,7 +145,17 @@ pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryErr
 
     registry.register(id, adapter)?;
 
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(PnpmManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
     let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(UvManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(YarnManagerAdapter);
     let id = adapter.id();
 
     registry.register(id, adapter)?;
