@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod install_request;
 pub mod npm;
+pub mod npm_policy;
 pub mod npm_registry;
 pub mod orchestrator;
 pub mod policy;
