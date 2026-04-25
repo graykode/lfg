@@ -3,15 +3,15 @@ use std::time::{Duration, SystemTime};
 
 use crate::builtins::{
     built_in_manager_adapters, built_in_release_decision_evaluators, built_in_release_resolvers,
-    built_in_review_provider, AdapterConfig, PathProgramDetector,
+    built_in_review_provider, AdapterConfig, PathProgramDetector, PolicyConfig,
 };
+use crate::core::Verdict;
 use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
 use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor};
 use crate::core::{
     InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter,
 };
-use crate::core::{ReviewPolicy, Verdict};
 use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
 use crate::providers::ArchiveDiffReviewer;
 
@@ -75,7 +75,10 @@ fn evaluate_manager_request(
         Err(_) => return resolver_unavailable_response(adapter.id()),
     };
 
-    let policy = ReviewPolicy::default();
+    let policy = match PolicyConfig::from_env() {
+        Ok(config) => config.review_policy(),
+        Err(_) => return policy_config_error_response(adapter.id()),
+    };
     let evaluator_registry = match built_in_release_decision_evaluators(&policy) {
         Ok(registry) => registry,
         Err(_) => return evaluator_unavailable_response(adapter.id()),
@@ -190,6 +193,16 @@ fn resolver_unavailable_response(manager_id: &str) -> CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
         stderr: format!("lfg: {manager_id} resolver is unavailable; install is paused.\n"),
+    }
+}
+
+fn policy_config_error_response(manager_id: &str) -> CliResponse {
+    CliResponse {
+        exit_code: Verdict::Ask.exit_code(),
+        stdout: String::new(),
+        stderr: format!(
+            "lfg: {manager_id} review policy configuration is invalid; install is paused.\n"
+        ),
     }
 }
 

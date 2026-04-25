@@ -17,6 +17,9 @@ Default:
 review_age_threshold = "24h"
 ```
 
+The current environment override is `LFG_REVIEW_AGE_THRESHOLD_SECONDS`.
+It must be a positive integer number of seconds.
+
 Decision table:
 
 | Condition | Decision |

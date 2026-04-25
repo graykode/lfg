@@ -31,13 +31,17 @@ pub struct ReviewPolicy {
 
 impl Default for ReviewPolicy {
     fn default() -> Self {
-        Self {
-            review_age_threshold: Duration::from_secs(24 * 60 * 60),
-        }
+        Self::new(Duration::from_secs(24 * 60 * 60))
     }
 }
 
 impl ReviewPolicy {
+    pub const fn new(review_age_threshold: Duration) -> Self {
+        Self {
+            review_age_threshold,
+        }
+    }
+
     pub fn decide(&self, facts: &ReleaseFacts) -> ReviewDecision {
         let Some(target_age) = facts.target_age else {
             return ReviewDecision::Ask(AskReason::MissingTargetPublishTime);
@@ -83,6 +87,17 @@ mod tests {
             policy.decide(&facts),
             ReviewDecision::Skip(SkipReason::OlderThanThreshold)
         );
+    }
+
+    #[test]
+    fn custom_threshold_reviews_releases_within_configured_window() {
+        let policy = ReviewPolicy::new(Duration::from_secs(48 * 60 * 60));
+        let facts = ReleaseFacts {
+            target_age: Some(Duration::from_secs(25 * 60 * 60)),
+            has_previous_release: true,
+        };
+
+        assert_eq!(policy.decide(&facts), ReviewDecision::Review);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use std::env;
 use std::path::Path;
+use std::time::Duration;
 
 use crate::core::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
 use crate::core::{Registry, RegistryError};
@@ -25,6 +26,59 @@ impl AdapterConfig {
                 .unwrap_or_else(|_| "https://registry.npmjs.org".to_owned()),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyConfig {
+    pub review_age_threshold: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyConfigError {
+    InvalidReviewAgeThreshold,
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        Self {
+            review_age_threshold: Duration::from_secs(24 * 60 * 60),
+        }
+    }
+}
+
+impl PolicyConfig {
+    pub fn from_env() -> Result<Self, PolicyConfigError> {
+        let mut config = Self::default();
+
+        if let Some(threshold) = configured_review_age_threshold()? {
+            config.review_age_threshold = threshold;
+        }
+
+        Ok(config)
+    }
+
+    pub fn review_policy(&self) -> ReviewPolicy {
+        ReviewPolicy::new(self.review_age_threshold)
+    }
+}
+
+fn configured_review_age_threshold() -> Result<Option<Duration>, PolicyConfigError> {
+    let value = match env::var("LFG_REVIEW_AGE_THRESHOLD_SECONDS") {
+        Ok(value) => value,
+        Err(env::VarError::NotPresent) => return Ok(None),
+        Err(env::VarError::NotUnicode(_)) => {
+            return Err(PolicyConfigError::InvalidReviewAgeThreshold);
+        }
+    };
+
+    let seconds = value
+        .parse::<u64>()
+        .map_err(|_| PolicyConfigError::InvalidReviewAgeThreshold)?;
+    if seconds == 0 {
+        return Err(PolicyConfigError::InvalidReviewAgeThreshold);
+    }
+
+    Ok(Some(Duration::from_secs(seconds)))
 }
 
 pub trait ProgramDetector {

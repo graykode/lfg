@@ -419,6 +419,45 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
 }
 
 #[test]
+fn explicit_npm_install_uses_configured_review_age_threshold() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+    let temp_dir = temp_test_dir("lfg-fake-threshold");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    write_fake_npm_bin(&fake_bin_dir);
+
+    let output = run_lfg_with_registry_now_and_env(
+        &["npm", "install", "recent-package"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "LFG_REVIEW_AGE_THRESHOLD_SECONDS",
+                (48 * 60 * 60).to_string(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(20));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("stderr is utf-8"),
+        "lfg: review required for npm install, but provider review is not wired yet. install is paused.\n"
+    );
+    assert!(!fake_args_path.exists());
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+
+    fs::remove_dir_all(temp_dir).expect("remove fake threshold temp dir");
+}
+
+#[test]
 fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
     let packument = r#"{
       "name": "old-package",
