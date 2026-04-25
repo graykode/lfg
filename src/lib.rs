@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod archive;
+pub mod archive_diff;
 pub mod builtins;
 pub mod cli;
 pub mod install_request;
