@@ -18,6 +18,40 @@ pub trait NpmPackumentClient {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NpmHttpPackumentClient {
+    registry_base_url: String,
+}
+
+impl NpmHttpPackumentClient {
+    pub fn new(registry_base_url: impl Into<String>) -> Self {
+        Self {
+            registry_base_url: registry_base_url.into(),
+        }
+    }
+}
+
+impl NpmPackumentClient for NpmHttpPackumentClient {
+    fn fetch_packument(&self, package_name: &str) -> Result<String, NpmFetchError> {
+        let url = format!(
+            "{}/{}",
+            self.registry_base_url.trim_end_matches('/'),
+            encode_package_name_for_registry_path(package_name)
+        );
+
+        ureq::get(&url)
+            .header(
+                "Accept",
+                "application/vnd.npm.install-v1+json, application/json",
+            )
+            .call()
+            .map_err(|error| NpmFetchError::Unavailable(error.to_string()))?
+            .body_mut()
+            .read_to_string()
+            .map_err(|error| NpmFetchError::Unavailable(error.to_string()))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NpmRegistryResolver<C> {
     client: C,
 }
@@ -117,6 +151,10 @@ fn split_npm_spec(spec: &str) -> (&str, Option<&str>) {
         Some(index) if index > 0 => (&spec[..index], Some(&spec[(index + 1)..])),
         _ => (spec, None),
     }
+}
+
+fn encode_package_name_for_registry_path(package_name: &str) -> String {
+    package_name.replace('/', "%2F")
 }
 
 fn previous_release(packument: &Value, target: &NpmRelease) -> Result<NpmRelease, NpmResolveError> {
