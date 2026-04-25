@@ -15,11 +15,11 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Work on **Milestone 4: Adapter Protocol**.
+Work on **Milestone 5: More Managers**.
 
-Do not move core install assessment, policy, diff, provider, verdict, shim,
-or execution behavior into plugins. External adapters should describe the
-same logical contracts that built-in adapters already use.
+Add new package managers through focused manager adapters and shared
+ecosystem resolvers. Prefer the npm ecosystem path first for `pnpm` and
+`yarn` before adding new registry ecosystems.
 
 ## Non-Negotiables
 
