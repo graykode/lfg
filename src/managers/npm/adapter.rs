@@ -1,7 +1,5 @@
-use crate::core::contracts::{ManagerAdapterError, ManagerIntegrationAdapter};
-use crate::core::install_request::{
-    InstallOperation, InstallRequest, InstallTarget, PackageManager,
-};
+use crate::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use crate::core::{ManagerAdapterError, ManagerIntegrationAdapter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpmManagerAdapter;
@@ -16,7 +14,7 @@ impl ManagerIntegrationAdapter for NpmManagerAdapter {
     }
 }
 
-pub fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
+fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
     let Some(command) = args.first() else {
         return Err(ManagerAdapterError::MissingCommand);
     };

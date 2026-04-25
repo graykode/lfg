@@ -1,16 +1,14 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use lfg::core::contracts::{
+use lfg::core::{evaluate_install_request, ReleaseDecisionError, ReleaseDecisionEvaluator};
+use lfg::core::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use lfg::core::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::core::outcome::{PackageOutcome, ReviewUnavailableReason};
-use lfg::core::policy::{AskReason, ReviewDecision, SkipReason};
-use lfg::core::review_pipeline::{
-    evaluate_install_request, ReleaseDecisionError, ReleaseDecisionEvaluator,
-};
+use lfg::core::{AskReason, ReviewDecision, SkipReason};
+use lfg::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use lfg::core::{PackageOutcome, ReviewUnavailableReason};
 
 #[derive(Debug, Clone)]
 struct StaticResolver {

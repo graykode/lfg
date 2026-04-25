@@ -1,4 +1,4 @@
-use crate::core::verdict::Verdict;
+use crate::core::Verdict;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderReview {

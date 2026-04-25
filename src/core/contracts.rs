@@ -1,4 +1,4 @@
-use crate::core::install_request::{InstallRequest, InstallTarget};
+use crate::core::{InstallRequest, InstallTarget};
 
 pub trait ManagerIntegrationAdapter {
     fn id(&self) -> &'static str;

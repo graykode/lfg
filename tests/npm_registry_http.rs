@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread;
 
-use lfg::managers::npm::registry::{NpmHttpPackumentClient, NpmPackumentClient};
+use lfg::managers::npm::{NpmHttpPackumentClient, NpmPackumentClient};
 
 fn serve_once(response_body: &'static str) -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");

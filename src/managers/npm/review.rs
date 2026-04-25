@@ -1,11 +1,11 @@
 use std::time::SystemTime;
 
-use crate::core::contracts::EcosystemReleaseResolver;
-use crate::core::install_request::InstallRequest;
-use crate::core::outcome::PackageOutcome;
-use crate::core::policy::ReviewPolicy;
-use crate::core::review_pipeline::evaluate_install_request;
-use crate::managers::npm::policy::NpmReleaseDecisionEvaluator;
+use crate::core::evaluate_install_request;
+use crate::core::EcosystemReleaseResolver;
+use crate::core::InstallRequest;
+use crate::core::PackageOutcome;
+use crate::core::ReviewPolicy;
+use crate::managers::npm::NpmReleaseDecisionEvaluator;
 
 pub fn evaluate_npm_install_request<R: EcosystemReleaseResolver + ?Sized>(
     request: &InstallRequest,

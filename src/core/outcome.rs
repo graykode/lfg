@@ -1,5 +1,5 @@
-use crate::core::policy::{AskReason, ReviewDecision, SkipReason};
-use crate::core::verdict::Verdict;
+use crate::core::Verdict;
+use crate::core::{AskReason, ReviewDecision, SkipReason};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReviewUnavailableReason {
@@ -51,8 +51,8 @@ pub fn aggregate_verdicts(outcomes: &[PackageOutcome]) -> Verdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::policy::{AskReason, ReviewDecision, SkipReason};
-    use crate::core::verdict::Verdict;
+    use crate::core::Verdict;
+    use crate::core::{AskReason, ReviewDecision, SkipReason};
 
     #[test]
     fn skipped_review_passes_install() {

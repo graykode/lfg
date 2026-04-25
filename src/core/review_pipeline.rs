@@ -1,9 +1,9 @@
 use std::time::SystemTime;
 
-use crate::core::contracts::{EcosystemReleaseResolver, ResolveError, ResolvedPackageReleases};
-use crate::core::install_request::InstallRequest;
-use crate::core::outcome::{PackageOutcome, ReviewUnavailableReason};
-use crate::core::policy::{AskReason, ReviewDecision};
+use crate::core::InstallRequest;
+use crate::core::{AskReason, ReviewDecision};
+use crate::core::{EcosystemReleaseResolver, ResolveError, ResolvedPackageReleases};
+use crate::core::{PackageOutcome, ReviewUnavailableReason};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReleaseDecisionError {

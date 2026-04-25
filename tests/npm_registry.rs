@@ -1,11 +1,9 @@
-use lfg::core::contracts::{
+use lfg::core::InstallTarget;
+use lfg::core::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use lfg::core::install_request::InstallTarget;
-use lfg::managers::npm::registry::{
-    resolve_packument_releases, NpmFetchError, NpmPackumentClient, NpmRegistryResolver,
-};
+use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 
 const PACKUMENT: &str = r#"{
   "name": "left-pad",
@@ -41,7 +39,7 @@ const PACKUMENT: &str = r#"{
 #[test]
 fn resolves_latest_target_and_previous_published_release() {
     assert_eq!(
-        resolve_packument_releases(PACKUMENT, "left-pad"),
+        resolve_fixture("left-pad", PACKUMENT, "left-pad"),
         Ok(ResolvedPackageReleases {
             package_name: "left-pad".to_owned(),
             target: ResolvedPackageRelease {
@@ -64,7 +62,7 @@ fn resolves_latest_target_and_previous_published_release() {
 
 #[test]
 fn explicit_version_overrides_latest_dist_tag() {
-    let resolved = resolve_packument_releases(PACKUMENT, "left-pad@1.2.0")
+    let resolved = resolve_fixture("left-pad", PACKUMENT, "left-pad@1.2.0")
         .expect("explicit version should resolve");
 
     assert_eq!(resolved.target.version, "1.2.0");
@@ -87,7 +85,7 @@ fn reports_missing_previous_release() {
     }"#;
 
     assert_eq!(
-        resolve_packument_releases(packument, "one-version"),
+        resolve_fixture("one-version", packument, "one-version"),
         Err(ResolveError::MissingPreviousRelease)
     );
 }
@@ -95,7 +93,7 @@ fn reports_missing_previous_release() {
 #[test]
 fn reports_missing_target_version() {
     assert_eq!(
-        resolve_packument_releases(PACKUMENT, "left-pad@9.9.9"),
+        resolve_fixture("left-pad", PACKUMENT, "left-pad@9.9.9"),
         Err(ResolveError::MissingTargetVersion("9.9.9".to_owned()))
     );
 }
@@ -115,6 +113,20 @@ impl NpmPackumentClient for StaticPackumentClient {
 
         Ok(self.packument.clone())
     }
+}
+
+fn resolve_fixture(
+    package_name: &str,
+    packument: &str,
+    target_spec: &str,
+) -> Result<ResolvedPackageReleases, ResolveError> {
+    NpmRegistryResolver::new(StaticPackumentClient {
+        expected_package_name: package_name.to_owned(),
+        packument: packument.to_owned(),
+    })
+    .resolve(&InstallTarget {
+        spec: target_spec.to_owned(),
+    })
 }
 
 #[test]

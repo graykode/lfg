@@ -1,6 +1,6 @@
-use crate::core::contracts::{ArchiveRef, ResolvedPackageReleases};
-use crate::evidence::archive::{read_tgz_source_tree, ArchiveError};
-use crate::evidence::source_diff::{DiffEngine, DiffError, SourceDiff};
+use crate::core::{ArchiveRef, ResolvedPackageReleases};
+use crate::evidence::{read_tgz_source_tree, ArchiveError};
+use crate::evidence::{DiffEngine, DiffError, SourceDiff};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArchiveFetchError {

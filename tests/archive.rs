@@ -2,8 +2,8 @@ use std::io::Write;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use lfg::evidence::archive::{read_tgz_source_tree, ArchiveError};
-use lfg::evidence::source_diff::SourceTree;
+use lfg::evidence::SourceTree;
+use lfg::evidence::{read_tgz_source_tree, ArchiveError};
 use tar::{Builder, EntryType, Header};
 
 fn tgz(entries: &[(&str, &str)]) -> Vec<u8> {

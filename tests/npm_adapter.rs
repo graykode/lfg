@@ -1,6 +1,8 @@
-use lfg::core::contracts::ManagerAdapterError;
-use lfg::core::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::managers::npm::adapter::parse_npm_install;
+use lfg::core::{
+    InstallOperation, InstallRequest, InstallTarget, ManagerAdapterError,
+    ManagerIntegrationAdapter, PackageManager,
+};
+use lfg::managers::npm::NpmManagerAdapter;
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
@@ -9,7 +11,7 @@ fn args(values: &[&str]) -> Vec<String> {
 #[test]
 fn parses_npm_install_package() {
     assert_eq!(
-        parse_npm_install(&args(&["install", "left-pad"])),
+        NpmManagerAdapter.parse_install(&args(&["install", "left-pad"])),
         Ok(InstallRequest {
             manager: PackageManager::Npm,
             operation: InstallOperation::Install,
@@ -23,8 +25,9 @@ fn parses_npm_install_package() {
 
 #[test]
 fn parses_npm_i_alias() {
-    let request =
-        parse_npm_install(&args(&["i", "@scope/pkg@1.2.3"])).expect("npm i alias should parse");
+    let request = NpmManagerAdapter
+        .parse_install(&args(&["i", "@scope/pkg@1.2.3"]))
+        .expect("npm i alias should parse");
 
     assert_eq!(request.manager, PackageManager::Npm);
     assert_eq!(request.operation, InstallOperation::Install);
@@ -40,7 +43,7 @@ fn parses_npm_i_alias() {
 #[test]
 fn rejects_npm_install_without_package() {
     assert_eq!(
-        parse_npm_install(&args(&["install"])),
+        NpmManagerAdapter.parse_install(&args(&["install"])),
         Err(ManagerAdapterError::MissingPackage)
     );
 }
@@ -48,7 +51,7 @@ fn rejects_npm_install_without_package() {
 #[test]
 fn rejects_unsupported_npm_command() {
     assert_eq!(
-        parse_npm_install(&args(&["run", "build"])),
+        NpmManagerAdapter.parse_install(&args(&["run", "build"])),
         Err(ManagerAdapterError::UnsupportedCommand("run".to_owned()))
     );
 }

@@ -1,10 +1,10 @@
 use serde_json::Value;
 
-use crate::core::contracts::{
+use crate::core::InstallTarget;
+use crate::core::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use crate::core::install_request::InstallTarget;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmFetchError {
@@ -78,7 +78,7 @@ impl<C: NpmPackumentClient> EcosystemReleaseResolver for NpmRegistryResolver<C> 
     }
 }
 
-pub fn resolve_packument_releases(
+fn resolve_packument_releases(
     packument_json: &str,
     target_spec: &str,
 ) -> Result<ResolvedPackageReleases, ResolveError> {

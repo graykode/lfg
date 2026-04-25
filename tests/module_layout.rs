@@ -1,18 +1,17 @@
-use lfg::core::contracts::{ArchiveRef, ManagerIntegrationAdapter};
-use lfg::core::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::core::outcome::{aggregate_verdicts, PackageOutcome};
-use lfg::core::policy::SkipReason;
-use lfg::core::registry::Registry;
-use lfg::core::review_pipeline::{evaluate_install_request, ReleaseDecisionEvaluator};
-use lfg::core::verdict::Verdict;
-use lfg::evidence::archive::read_tgz_source_tree;
-use lfg::evidence::archive_diff::{ArchiveFetcher, HttpArchiveFetcher};
-use lfg::evidence::source_diff::{DiffEngine, SourceTree, UnifiedDiffEngine};
-use lfg::managers::npm::adapter::NpmManagerAdapter;
-use lfg::managers::npm::policy::NpmReleaseDecisionEvaluator;
-use lfg::managers::npm::registry::NpmRegistryResolver;
-use lfg::managers::npm::review::evaluate_npm_install_request;
-use lfg::providers::output::parse_provider_output;
+use lfg::core::{
+    aggregate_verdicts, evaluate_install_request, ArchiveRef, InstallOperation, InstallRequest,
+    InstallTarget, ManagerIntegrationAdapter, PackageManager, PackageOutcome, Registry,
+    ReleaseDecisionEvaluator, SkipReason, Verdict,
+};
+use lfg::evidence::{
+    read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
+    UnifiedDiffEngine,
+};
+use lfg::managers::npm::{
+    evaluate_npm_install_request, NpmManagerAdapter, NpmPackumentClient, NpmRegistryResolver,
+    NpmReleaseDecisionEvaluator,
+};
+use lfg::providers::parse_provider_output;
 
 #[test]
 fn public_modules_are_grouped_by_role() {
@@ -63,18 +62,18 @@ fn public_modules_are_grouped_by_role() {
 
 struct NeverPackumentClient;
 
-impl lfg::managers::npm::registry::NpmPackumentClient for NeverPackumentClient {
+impl NpmPackumentClient for NeverPackumentClient {
     fn fetch_packument(
         &self,
         _package_name: &str,
-    ) -> Result<String, lfg::managers::npm::registry::NpmFetchError> {
+    ) -> Result<String, lfg::managers::npm::NpmFetchError> {
         unreachable!("module layout test does not fetch packuments")
     }
 }
 
 struct NeverResolver;
 
-impl lfg::core::contracts::EcosystemReleaseResolver for NeverResolver {
+impl lfg::core::EcosystemReleaseResolver for NeverResolver {
     fn id(&self) -> &'static str {
         "never"
     }
@@ -82,8 +81,7 @@ impl lfg::core::contracts::EcosystemReleaseResolver for NeverResolver {
     fn resolve(
         &self,
         _target: &InstallTarget,
-    ) -> Result<lfg::core::contracts::ResolvedPackageReleases, lfg::core::contracts::ResolveError>
-    {
+    ) -> Result<lfg::core::ResolvedPackageReleases, lfg::core::ResolveError> {
         unreachable!("module layout test does not resolve packages")
     }
 }
@@ -93,10 +91,9 @@ struct NeverDecisionEvaluator;
 impl ReleaseDecisionEvaluator for NeverDecisionEvaluator {
     fn decide(
         &self,
-        _releases: &lfg::core::contracts::ResolvedPackageReleases,
+        _releases: &lfg::core::ResolvedPackageReleases,
         _now: std::time::SystemTime,
-    ) -> Result<lfg::core::policy::ReviewDecision, lfg::core::review_pipeline::ReleaseDecisionError>
-    {
+    ) -> Result<lfg::core::ReviewDecision, lfg::core::ReleaseDecisionError> {
         unreachable!("module layout test does not evaluate releases")
     }
 }

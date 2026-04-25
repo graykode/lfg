@@ -1,10 +1,10 @@
-use lfg::core::contracts::{
+use lfg::core::{
     ArchiveRef, EcosystemReleaseResolver, ManagerAdapterError, ManagerIntegrationAdapter,
     ResolveError, ResolvedPackageRelease, ResolvedPackageReleases,
 };
-use lfg::core::install_request::{InstallOperation, InstallTarget, PackageManager};
-use lfg::managers::npm::adapter::NpmManagerAdapter;
-use lfg::managers::npm::registry::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
+use lfg::core::{InstallOperation, InstallTarget, PackageManager};
+use lfg::managers::npm::NpmManagerAdapter;
+use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 
 struct StaticPackumentClient;
 

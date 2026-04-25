@@ -1,4 +1,4 @@
-use lfg::evidence::source_diff::{DiffEngine, SourceTree, UnifiedDiffEngine};
+use lfg::evidence::{DiffEngine, SourceTree, UnifiedDiffEngine};
 
 #[test]
 fn renders_changed_text_file_as_unified_diff() {

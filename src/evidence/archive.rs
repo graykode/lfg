@@ -5,7 +5,7 @@ use std::path::{Component, Path};
 use flate2::read::GzDecoder;
 use tar::Archive;
 
-use crate::evidence::source_diff::SourceTree;
+use crate::evidence::SourceTree;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArchiveError {
