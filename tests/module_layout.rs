@@ -12,7 +12,10 @@ use lfg::managers::npm::{
     evaluate_npm_install_request, NpmManagerAdapter, NpmPackumentClient, NpmRegistryResolver,
     NpmReleaseDecisionEvaluator,
 };
-use lfg::providers::{parse_provider_output, ArchiveDiffReviewer};
+use lfg::providers::{
+    parse_provider_output, ArchiveDiffReviewer, DiffReviewPromptBuilder, ProviderError,
+    ReviewPrompt, ReviewProvider, UnavailableReviewProvider,
+};
 
 #[test]
 fn public_modules_are_grouped_by_role() {
@@ -56,6 +59,12 @@ fn public_modules_are_grouped_by_role() {
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
     let _ = ArchiveDiffReviewer::<HttpArchiveFetcher, UnifiedDiffEngine>::new;
+    let _ = DiffReviewPromptBuilder;
+    let _ = UnavailableReviewProvider;
+    let _ = ReviewPrompt {
+        text: String::new(),
+    };
+    let _ = ProviderError::Timeout;
     let _ = evaluate_npm_install_request::<NpmRegistryResolver<NeverPackumentClient>>;
     let _ = evaluate_install_request::<NeverResolver, NeverDecisionEvaluator>;
     let _ = evaluate_install_request_with_reviewer::<
@@ -65,6 +74,7 @@ fn public_modules_are_grouped_by_role() {
     >;
     let _ = <NeverDecisionEvaluator as ReleaseDecisionEvaluator>::decide;
     let _ = <UnavailableReleaseReviewer as ReleaseReviewer>::review;
+    let _ = <UnavailableReviewProvider as ReviewProvider>::review;
     let _ = request;
 }
 

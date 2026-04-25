@@ -5,10 +5,10 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use lfg::core::{
     ArchiveRef, PackageOutcome, ReleaseReviewer, ResolvedPackageRelease, ResolvedPackageReleases,
-    ReviewUnavailableReason,
+    ReviewUnavailableReason, Verdict,
 };
 use lfg::evidence::{ArchiveFetchError, ArchiveFetcher, UnifiedDiffEngine};
-use lfg::providers::ArchiveDiffReviewer;
+use lfg::providers::{ArchiveDiffReviewer, ProviderError, ReviewPrompt, ReviewProvider};
 use tar::{Builder, Header};
 
 #[derive(Debug, Clone)]
@@ -22,6 +22,25 @@ impl ArchiveFetcher for StaticArchiveFetcher {
             .get(&archive.url)
             .cloned()
             .ok_or_else(|| ArchiveFetchError::Unavailable(archive.url.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StaticProvider {
+    output: Result<String, ProviderError>,
+}
+
+impl ReviewProvider for StaticProvider {
+    fn id(&self) -> &'static str {
+        "static"
+    }
+
+    fn review(&self, prompt: &ReviewPrompt) -> Result<String, ProviderError> {
+        assert!(prompt.text.contains("package: demo"));
+        assert!(prompt.text.contains("target version: 1.1.0"));
+        assert!(prompt.text.contains("+module.exports = 2;"));
+
+        self.output.clone()
     }
 }
 
@@ -83,6 +102,63 @@ fn successful_archive_diff_waits_for_provider_review() {
             ]),
         },
         UnifiedDiffEngine,
+    );
+
+    assert_eq!(
+        reviewer.review(&releases()),
+        PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::ProviderFailure)
+    );
+}
+
+#[test]
+fn successful_archive_diff_returns_provider_verdict() {
+    let reviewer = ArchiveDiffReviewer::with_provider(
+        StaticArchiveFetcher {
+            archives: BTreeMap::from([
+                (
+                    "memory://demo-1.0.0.tgz".to_owned(),
+                    tgz(&[("package/index.js", "module.exports = 1;\n")]),
+                ),
+                (
+                    "memory://demo-1.1.0.tgz".to_owned(),
+                    tgz(&[("package/index.js", "module.exports = 2;\n")]),
+                ),
+            ]),
+        },
+        UnifiedDiffEngine,
+        StaticProvider {
+            output: Ok(
+                "verdict: block\nreason: added risky code\n\nevidence:\n- package/index.js: changed runtime export\n"
+                    .to_owned(),
+            ),
+        },
+    );
+
+    assert_eq!(
+        reviewer.review(&releases()),
+        PackageOutcome::ProviderVerdict(Verdict::Block)
+    );
+}
+
+#[test]
+fn provider_failure_returns_provider_failure() {
+    let reviewer = ArchiveDiffReviewer::with_provider(
+        StaticArchiveFetcher {
+            archives: BTreeMap::from([
+                (
+                    "memory://demo-1.0.0.tgz".to_owned(),
+                    tgz(&[("package/index.js", "module.exports = 1;\n")]),
+                ),
+                (
+                    "memory://demo-1.1.0.tgz".to_owned(),
+                    tgz(&[("package/index.js", "module.exports = 2;\n")]),
+                ),
+            ]),
+        },
+        UnifiedDiffEngine,
+        StaticProvider {
+            output: Err(ProviderError::Failure("provider failed".to_owned())),
+        },
     );
 
     assert_eq!(
