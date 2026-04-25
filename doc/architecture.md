@@ -48,13 +48,24 @@ It knows contracts:
 - a verdict parser can convert raw output into `pass`, `ask`, or `block`
 - an install gate can decide whether the real manager is executed
 
+## Install Assessment Flow
+
+The install assessment flow separates package assessment into three roles:
+
+- resolver: turns an install target into resolved package releases, including
+  the target release, previous release, publish metadata, and archive URLs
+- decision evaluator: applies policy to resolved release metadata and decides
+  whether to skip, ask, or perform a review
+- reviewer: gathers review evidence for releases that require review, asks the
+  selected provider when available, and returns the package outcome
+
 ## Code Layout
 
 The Rust code is grouped by role:
 
 ```text
 src/
-  core/              shared contracts, policy, verdicts, outcomes, pipeline
+  core/              shared contracts, policy, verdicts, outcomes, assessment flow
   evidence/          archive reading, archive fetching, source diff creation
   managers/npm/      npm CLI parsing, npm registry metadata, npm policy glue
   providers/         provider output parsing and future provider adapters
@@ -62,7 +73,7 @@ src/
   cli.rs             CLI entrypoint behavior
 ```
 
-Start in `core/review_pipeline.rs` for the manager-neutral review flow.
+Start in `core/install_assessment.rs` for the manager-neutral assessment flow.
 Look in `managers/npm/` only for npm-specific parsing and metadata code.
 
 ## Command Shim
