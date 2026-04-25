@@ -226,7 +226,7 @@ fn cli_result(
         Verdict::Pass => (
             Verdict::Ask.exit_code(),
             format!(
-                "lfg: {manager_id} review is not required by policy, but {manager_id} execution is not wired yet. install is paused.\n"
+                "lfg: {manager_id} {operation} reached pass verdict without execution; install is paused.\n"
             ),
         ),
         Verdict::Ask => (
