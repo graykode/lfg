@@ -1,0 +1,14 @@
+/target
+.DS_Store
+.agent/
+.claude/worktrees/
+docs/superpowers/
+demo.tape
+.idea/
+
+# Env / secrets
+.env
+.env.*
+
+# Editor
+*.swp
