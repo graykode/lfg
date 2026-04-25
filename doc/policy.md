@@ -90,6 +90,15 @@ Without an explicit provider override, lfg uses this default order:
 3. other local model adapters
 4. API provider adapters
 
+The current explicit provider override is `LFG_REVIEW_PROVIDER`.
+
+| Value | Behavior |
+|---|---|
+| unset or `auto` | use the default provider order |
+| `claude` or `claude-cli` | use the local Claude CLI only |
+| `codex` or `codex-cli` | use the local Codex CLI only |
+| `none` | disable provider execution and return `ask` when review is required |
+
 Provider configuration must not imply a hosted lfg backend. Diffs go from
 the user's machine to the selected provider.
 

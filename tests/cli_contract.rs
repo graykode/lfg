@@ -25,6 +25,7 @@ fn run_lfg_with_registry_and_now(
         .args(args)
         .env("LFG_NPM_REGISTRY_URL", registry_base_url)
         .env("LFG_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
+        .env("LFG_REVIEW_PROVIDER", "none")
         .output()
         .expect("run lfg binary")
 }

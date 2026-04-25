@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::builtins::{
     built_in_manager_adapters, built_in_release_decision_evaluators, built_in_release_resolvers,
-    AdapterConfig,
+    built_in_review_provider, AdapterConfig, PathProgramDetector,
 };
 use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
@@ -84,7 +84,9 @@ fn evaluate_manager_request(
         Err(_) => return evaluator_unavailable_response(adapter.id()),
     };
 
-    let reviewer = ArchiveDiffReviewer::new(HttpArchiveFetcher, UnifiedDiffEngine);
+    let provider = built_in_review_provider(&PathProgramDetector);
+    let reviewer =
+        ArchiveDiffReviewer::with_provider(HttpArchiveFetcher, UnifiedDiffEngine, provider);
     let outcomes = evaluate_install_request_with_reviewer(
         &request,
         resolver.as_ref(),

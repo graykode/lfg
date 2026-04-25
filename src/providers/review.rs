@@ -18,6 +18,19 @@ pub trait ReviewProvider {
     fn review(&self, prompt: &ReviewPrompt) -> Result<String, ProviderError>;
 }
 
+impl<T> ReviewProvider for Box<T>
+where
+    T: ReviewProvider + ?Sized,
+{
+    fn id(&self) -> &'static str {
+        self.as_ref().id()
+    }
+
+    fn review(&self, prompt: &ReviewPrompt) -> Result<String, ProviderError> {
+        self.as_ref().review(prompt)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnavailableReviewProvider;
 
