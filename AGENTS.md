@@ -15,11 +15,11 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Work on **Milestone 2: Command Shim Install**.
+Work on **Milestone 3: Python Ecosystem**.
 
-Keep normal package manager commands behind the same install gate proven
-by the explicit wrapper. Start with shim detection, real-binary lookup,
-and recursion protection before adding convenience setup commands.
+Keep pip and uv manager adapters thin. Share PyPI release resolution
+between them, and keep diff, policy, provider, verdict, shim, and
+execution behavior in the existing manager-neutral paths.
 
 ## Non-Negotiables
 
