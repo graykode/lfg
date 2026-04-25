@@ -1,5 +1,48 @@
 use serde_json::Value;
 
+use crate::install_request::InstallTarget;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NpmFetchError {
+    Unavailable(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NpmRegistryError {
+    Fetch(NpmFetchError),
+    Resolve(NpmResolveError),
+}
+
+pub trait NpmPackumentClient {
+    fn fetch_packument(&self, package_name: &str) -> Result<String, NpmFetchError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NpmRegistryResolver<C> {
+    client: C,
+}
+
+impl<C> NpmRegistryResolver<C> {
+    pub const fn new(client: C) -> Self {
+        Self { client }
+    }
+}
+
+impl<C: NpmPackumentClient> NpmRegistryResolver<C> {
+    pub fn resolve_target(
+        &self,
+        target: &InstallTarget,
+    ) -> Result<ResolvedNpmReleases, NpmRegistryError> {
+        let (package_name, _) = split_npm_spec(&target.spec);
+        let packument = self
+            .client
+            .fetch_packument(package_name)
+            .map_err(NpmRegistryError::Fetch)?;
+
+        resolve_packument_releases(&packument, &target.spec).map_err(NpmRegistryError::Resolve)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NpmRelease {
     pub version: String,

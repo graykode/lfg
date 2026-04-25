@@ -1,5 +1,7 @@
+use lfg::install_request::InstallTarget;
 use lfg::npm_registry::{
-    resolve_packument_releases, NpmRelease, NpmResolveError, ResolvedNpmReleases,
+    resolve_packument_releases, NpmFetchError, NpmPackumentClient, NpmRegistryError,
+    NpmRegistryResolver, NpmRelease, NpmResolveError, ResolvedNpmReleases,
 };
 
 const PACKUMENT: &str = r#"{
@@ -88,5 +90,74 @@ fn reports_missing_target_version() {
     assert_eq!(
         resolve_packument_releases(PACKUMENT, "left-pad@9.9.9"),
         Err(NpmResolveError::MissingTargetVersion("9.9.9".to_owned()))
+    );
+}
+
+struct StaticPackumentClient {
+    expected_package_name: String,
+    packument: String,
+}
+
+impl NpmPackumentClient for StaticPackumentClient {
+    fn fetch_packument(&self, package_name: &str) -> Result<String, NpmFetchError> {
+        if package_name != self.expected_package_name {
+            return Err(NpmFetchError::Unavailable(format!(
+                "unexpected package name: {package_name}"
+            )));
+        }
+
+        Ok(self.packument.clone())
+    }
+}
+
+#[test]
+fn resolver_fetches_packument_by_package_name_and_resolves_target_spec() {
+    let resolver = NpmRegistryResolver::new(StaticPackumentClient {
+        expected_package_name: "left-pad".to_owned(),
+        packument: PACKUMENT.to_owned(),
+    });
+
+    let resolved = resolver
+        .resolve_target(&InstallTarget {
+            spec: "left-pad@1.2.0".to_owned(),
+        })
+        .expect("target should resolve");
+
+    assert_eq!(resolved.target.version, "1.2.0");
+    assert_eq!(resolved.previous.version, "1.0.0");
+}
+
+#[test]
+fn resolver_uses_scoped_package_name_without_version_for_fetch() {
+    let scoped_packument = PACKUMENT.replace("\"left-pad\"", "\"@scope/pkg\"");
+    let resolver = NpmRegistryResolver::new(StaticPackumentClient {
+        expected_package_name: "@scope/pkg".to_owned(),
+        packument: scoped_packument,
+    });
+
+    let resolved = resolver
+        .resolve_target(&InstallTarget {
+            spec: "@scope/pkg@1.1.0".to_owned(),
+        })
+        .expect("scoped target should resolve");
+
+    assert_eq!(resolved.package_name, "@scope/pkg");
+    assert_eq!(resolved.target.version, "1.1.0");
+}
+
+#[test]
+fn resolver_maps_fetch_errors() {
+    let resolver = NpmRegistryResolver::new(StaticPackumentClient {
+        expected_package_name: "other-package".to_owned(),
+        packument: PACKUMENT.to_owned(),
+    });
+
+    assert_eq!(
+        resolver.resolve_target(&InstallTarget {
+            spec: "left-pad".to_owned()
+        }),
+        Err(NpmRegistryError::Fetch(NpmFetchError::Unavailable(
+            "unexpected package name: left-pad".to_owned()
+        )))
     );
 }
