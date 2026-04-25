@@ -66,9 +66,10 @@ The Rust code is grouped by role:
 ```text
 src/
   core/              shared contracts, policy, verdicts, outcomes, assessment flow
+  ecosystems/npm/    npm registry metadata and npm release policy glue
   ecosystems/pypi/   PyPI registry metadata and Python release policy glue
   evidence/          archive reading, archive fetching, source diff creation
-  managers/npm/      npm CLI parsing, npm registry metadata, npm policy glue
+  managers/npm/      npm CLI parsing
   managers/pip/      pip CLI parsing
   managers/uv/       uv CLI parsing
   providers/         provider output parsing and future provider adapters

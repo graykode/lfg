@@ -3,8 +3,8 @@ use std::time::{Duration, SystemTime};
 use lfg::core::{AskReason, ReviewPolicy, SkipReason};
 use lfg::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
 use lfg::core::{PackageOutcome, ReviewUnavailableReason};
-use lfg::managers::npm::evaluate_npm_install_request;
-use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
+use lfg::ecosystems::npm::evaluate_npm_install_request;
+use lfg::ecosystems::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 
 const OLD_PACKUMENT: &str = r#"{
   "name": "old-package",

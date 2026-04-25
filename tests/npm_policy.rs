@@ -4,7 +4,7 @@ use lfg::core::{
     ArchiveRef, ReleaseDecisionError, ReleaseDecisionEvaluator, ResolvedPackageRelease,
     ResolvedPackageReleases, ReviewDecision, ReviewPolicy, SkipReason,
 };
-use lfg::managers::npm::NpmReleaseDecisionEvaluator;
+use lfg::ecosystems::npm::NpmReleaseDecisionEvaluator;
 
 fn resolved_releases(target_published_at: &str) -> ResolvedPackageReleases {
     ResolvedPackageReleases {

@@ -3,9 +3,9 @@ use lfg::core::{
     ResolveError, ResolvedPackageRelease, ResolvedPackageReleases,
 };
 use lfg::core::{InstallOperation, InstallTarget, PackageManager};
+use lfg::ecosystems::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 use lfg::ecosystems::pypi::{PypiFetchError, PypiProjectClient, PypiRegistryResolver};
 use lfg::managers::npm::NpmManagerAdapter;
-use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::uv::UvManagerAdapter;
 

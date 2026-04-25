@@ -4,6 +4,10 @@ use lfg::core::{
     PackageManager, PackageOutcome, Registry, ReleaseDecisionEvaluator, ReleaseReviewer,
     SkipReason, UnavailableReleaseReviewer, Verdict,
 };
+use lfg::ecosystems::npm::{
+    evaluate_npm_install_request, NpmPackumentClient, NpmRegistryResolver,
+    NpmReleaseDecisionEvaluator,
+};
 use lfg::ecosystems::pypi::{
     PypiHttpProjectClient, PypiProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
 };
@@ -11,10 +15,7 @@ use lfg::evidence::{
     read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
     UnifiedDiffEngine,
 };
-use lfg::managers::npm::{
-    evaluate_npm_install_request, NpmManagerAdapter, NpmPackumentClient, NpmRegistryResolver,
-    NpmReleaseDecisionEvaluator,
-};
+use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::uv::UvManagerAdapter;
 use lfg::providers::{
@@ -95,7 +96,7 @@ impl NpmPackumentClient for NeverPackumentClient {
     fn fetch_packument(
         &self,
         _package_name: &str,
-    ) -> Result<String, lfg::managers::npm::NpmFetchError> {
+    ) -> Result<String, lfg::ecosystems::npm::NpmFetchError> {
         unreachable!("module layout test does not fetch packuments")
     }
 }

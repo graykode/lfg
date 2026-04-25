@@ -5,7 +5,7 @@ use crate::core::EcosystemReleaseResolver;
 use crate::core::InstallRequest;
 use crate::core::PackageOutcome;
 use crate::core::ReviewPolicy;
-use crate::managers::npm::NpmReleaseDecisionEvaluator;
+use crate::ecosystems::npm::NpmReleaseDecisionEvaluator;
 
 pub fn evaluate_npm_install_request<R: EcosystemReleaseResolver + ?Sized>(
     request: &InstallRequest,

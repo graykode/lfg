@@ -5,12 +5,13 @@ use std::time::Duration;
 use crate::core::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
 use crate::core::{Registry, RegistryError};
 use crate::core::{ReleaseDecisionEvaluator, ReviewPolicy};
+use crate::ecosystems::npm::{
+    NpmHttpPackumentClient, NpmRegistryResolver, NpmReleaseDecisionEvaluator,
+};
 use crate::ecosystems::pypi::{
     PypiHttpProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
 };
 use crate::managers::npm::NpmManagerAdapter;
-use crate::managers::npm::NpmReleaseDecisionEvaluator;
-use crate::managers::npm::{NpmHttpPackumentClient, NpmRegistryResolver};
 use crate::managers::pip::PipManagerAdapter;
 use crate::managers::uv::UvManagerAdapter;
 use crate::providers::{CommandReviewProvider, ReviewProvider, UnavailableReviewProvider};

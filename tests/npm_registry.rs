@@ -3,7 +3,7 @@ use lfg::core::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use lfg::managers::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
+use lfg::ecosystems::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 
 const PACKUMENT: &str = r#"{
   "name": "left-pad",
