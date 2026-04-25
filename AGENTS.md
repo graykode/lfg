@@ -15,11 +15,11 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Work on **Milestone 1: Explicit Wrapper Vertical Slice**.
+Work on **Milestone 2: Command Shim Install**.
 
-Keep package-manager integration behind the explicit wrapper path until
-the npm resolver, archive diff, provider adapter, and gated execution are
-covered by tests.
+Keep normal package manager commands behind the same install gate proven
+by the explicit wrapper. Start with shim detection, real-binary lookup,
+and recursion protection before adding convenience setup commands.
 
 ## Non-Negotiables
 
