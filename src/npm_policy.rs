@@ -5,6 +5,7 @@ use time::OffsetDateTime;
 
 use crate::adapters::ResolvedPackageReleases;
 use crate::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy};
+use crate::review_pipeline::{ReleaseDecisionError, ReleaseDecisionEvaluator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmPolicyError {
@@ -45,6 +46,32 @@ pub fn decide_resolved_npm_releases(
 ) -> Result<ReviewDecision, NpmPolicyError> {
     let facts = release_facts_from_resolved_npm_releases(releases, now)?;
     Ok(policy.decide(&facts))
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct NpmReleaseDecisionEvaluator<'a> {
+    policy: &'a ReviewPolicy,
+}
+
+impl<'a> NpmReleaseDecisionEvaluator<'a> {
+    pub const fn new(policy: &'a ReviewPolicy) -> Self {
+        Self { policy }
+    }
+}
+
+impl ReleaseDecisionEvaluator for NpmReleaseDecisionEvaluator<'_> {
+    fn decide(
+        &self,
+        releases: &ResolvedPackageReleases,
+        now: SystemTime,
+    ) -> Result<ReviewDecision, ReleaseDecisionError> {
+        decide_resolved_npm_releases(self.policy, releases, now).map_err(|error| match error {
+            NpmPolicyError::InvalidTargetPublishTime(_)
+            | NpmPolicyError::FutureTargetPublishTime(_) => {
+                ReleaseDecisionError::MissingTargetPublishTime
+            }
+        })
+    }
 }
 
 fn parse_target_publish_time(published_at: &str) -> Result<OffsetDateTime, NpmPolicyError> {
