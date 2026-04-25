@@ -41,6 +41,17 @@ fn parses_npm_i_alias() {
 }
 
 #[test]
+fn builds_real_npm_command_from_original_args() {
+    let request = NpmManagerAdapter
+        .parse_install(&args(&["install", "--save-dev", "left-pad"]))
+        .expect("npm install should parse");
+    let command = NpmManagerAdapter.real_command(&request);
+
+    assert_eq!(command.program, "npm");
+    assert_eq!(command.args, args(&["install", "--save-dev", "left-pad"]));
+}
+
+#[test]
 fn rejects_npm_install_without_package() {
     assert_eq!(
         NpmManagerAdapter.parse_install(&args(&["install"])),

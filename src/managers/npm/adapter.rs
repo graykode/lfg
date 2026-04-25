@@ -1,4 +1,4 @@
-use crate::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use crate::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager, RealCommand};
 use crate::core::{ManagerAdapterError, ManagerIntegrationAdapter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +19,13 @@ impl ManagerIntegrationAdapter for NpmManagerAdapter {
 
     fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
         parse_npm_install(args)
+    }
+
+    fn real_command(&self, request: &InstallRequest) -> RealCommand {
+        RealCommand {
+            program: "npm".to_owned(),
+            args: request.manager_args.clone(),
+        }
     }
 }
 

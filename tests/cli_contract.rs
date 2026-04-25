@@ -1,9 +1,13 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
 use std::time::{Duration, Instant};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -28,6 +32,58 @@ fn run_lfg_with_registry_and_now(
         .env("LFG_REVIEW_PROVIDER", "none")
         .output()
         .expect("run lfg binary")
+}
+
+fn run_lfg_with_registry_now_and_env(
+    args: &[&str],
+    registry_base_url: &str,
+    now_unix_seconds: u64,
+    envs: &[(&str, String)],
+) -> std::process::Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lfg"));
+    command
+        .args(args)
+        .env("LFG_NPM_REGISTRY_URL", registry_base_url)
+        .env("LFG_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
+        .env("LFG_REVIEW_PROVIDER", "none");
+
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+
+    command.output().expect("run lfg binary")
+}
+
+fn temp_test_dir(prefix: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock after epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!("{prefix}-{nanos}"))
+}
+
+fn write_fake_npm_bin(dir: &Path) {
+    fs::create_dir_all(dir).expect("create fake bin dir");
+    let npm_path = dir.join("npm");
+    fs::write(
+        &npm_path,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LFG_FAKE_NPM_ARGS\"\nprintf 'fake npm stdout\\n'\nprintf 'fake npm stderr\\n' >&2\n",
+    )
+    .expect("write fake npm");
+    let mut permissions = fs::metadata(&npm_path)
+        .expect("read fake npm metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(npm_path, permissions).expect("mark fake npm executable");
+}
+
+fn path_with_fake_bin(bin_dir: &Path) -> String {
+    let existing = std::env::var_os("PATH").unwrap_or_default();
+    let paths = std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(&existing));
+    std::env::join_paths(paths)
+        .expect("join PATH")
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<String>) {
@@ -242,7 +298,7 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
 }
 
 #[test]
-fn explicit_old_npm_install_fetches_metadata_and_pauses_before_execution() {
+fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
     let packument = r#"{
       "name": "old-package",
       "dist-tags": { "latest": "1.1.0" },
@@ -260,21 +316,38 @@ fn explicit_old_npm_install_fetches_metadata_and_pauses_before_execution() {
       }
     }"#;
     let (registry_base_url, server) = serve_packument_once(packument);
+    let temp_dir = temp_test_dir("lfg-fake-npm");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    write_fake_npm_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_registry_and_now(
+    let output = run_lfg_with_registry_now_and_env(
         &["npm", "install", "old-package"],
         &registry_base_url,
         50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
     );
 
-    assert_eq!(output.status.code(), Some(20));
-
-    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert_eq!(output.status.code(), Some(0));
     assert_eq!(
-        stderr,
-        "lfg: npm review is not required by policy, but npm execution is not wired yet. install is paused.\n"
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake npm stdout\n"
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert_eq!(stderr, "fake npm stderr\n");
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
+        "install\nold-package\n"
     );
 
     let request = server.join().expect("server thread completes");
     assert!(request.starts_with("GET /old-package HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove fake npm temp dir");
 }

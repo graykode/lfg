@@ -7,6 +7,7 @@ use crate::builtins::{
 };
 use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
+use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor};
 use crate::core::{
     InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter,
 };
@@ -95,12 +96,48 @@ fn evaluate_manager_request(
         current_time(),
     );
     let verdict = aggregate_verdicts(&outcomes);
+    if verdict == Verdict::Pass {
+        return execute_manager_request(adapter, &request, &ProcessCommandExecutor);
+    }
+
     let (exit_code, stderr) = cli_result(adapter.id(), request.operation, &outcomes, verdict);
 
     CliResponse {
         exit_code,
         stdout: String::new(),
         stderr,
+    }
+}
+
+fn execute_manager_request(
+    adapter: &dyn ManagerIntegrationAdapter,
+    request: &InstallRequest,
+    executor: &dyn CommandExecutor,
+) -> CliResponse {
+    let command = adapter.real_command(request);
+
+    match executor.execute(&command) {
+        Ok(output) => CliResponse {
+            exit_code: output.exit_code,
+            stdout: output.stdout,
+            stderr: output.stderr,
+        },
+        Err(CommandExecutionError::Unavailable(_)) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "lfg: {} executable is unavailable; install is paused.\n",
+                adapter.id()
+            ),
+        },
+        Err(CommandExecutionError::Failed(_)) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "lfg: {} execution could not start; install is paused.\n",
+                adapter.id()
+            ),
+        },
     }
 }
 

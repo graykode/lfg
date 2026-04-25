@@ -1,10 +1,11 @@
-use crate::core::{InstallRequest, InstallTarget};
+use crate::core::{InstallRequest, InstallTarget, RealCommand};
 
 pub trait ManagerIntegrationAdapter {
     fn id(&self) -> &'static str;
     fn release_resolver_id(&self) -> &'static str;
     fn release_decision_evaluator_id(&self) -> &'static str;
     fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError>;
+    fn real_command(&self, request: &InstallRequest) -> RealCommand;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
