@@ -126,6 +126,28 @@ Registry responsibilities:
 The core orchestrator asks registries for adapters. It must not directly
 construct manager-specific or provider-specific implementations.
 
+## Adding a Manager
+
+Add package-manager support by touching the manager boundary first, then
+wire it into the built-in registry:
+
+- add `src/managers/<manager>/adapter.rs` and keep it limited to CLI parsing,
+  install target extraction, resolver/evaluator ids, and real command
+  preservation
+- export it from `src/managers/<manager>/mod.rs` and `src/managers/mod.rs`
+- add a `PackageManager` variant in `src/core/install_request.rs`
+- if the manager uses an existing ecosystem, point the adapter at that
+  resolver and policy; otherwise add a focused resolver under
+  `src/ecosystems/<ecosystem>/`
+- add the adapter to `built_in_manager_adapter_list()` in `src/builtins.rs`
+- add tests under `tests/managers/`, `tests/ecosystems/` when needed, and
+  `tests/contracts/adapter.rs`
+
+The manager adapter must still fail to `ask` for resolution-affecting
+options it cannot safely understand. It should not fetch registry metadata,
+build diffs, call providers, parse final verdicts, or execute the real
+package manager itself.
+
 ## Future External Adapter Protocol
 
 The extension model prefers external executable adapters.

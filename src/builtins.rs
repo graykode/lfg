@@ -149,42 +149,32 @@ impl ProgramDetector for PathProgramDetector {
 
 pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryError> {
     let mut registry = Registry::new();
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(CargoManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(GemManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(NpmManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(PipManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(PnpmManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(UvManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
-
-    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(YarnManagerAdapter);
-    let id = adapter.id();
-
-    registry.register(id, adapter)?;
+    for adapter in built_in_manager_adapter_list() {
+        register_manager_adapter(&mut registry, adapter)?;
+    }
 
     Ok(registry)
+}
+
+fn built_in_manager_adapter_list() -> [Box<dyn ManagerIntegrationAdapter>; 7] {
+    [
+        Box::new(CargoManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(GemManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(NpmManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(PipManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(PnpmManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(UvManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+        Box::new(YarnManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
+    ]
+}
+
+fn register_manager_adapter(
+    registry: &mut ManagerAdapterRegistry,
+    adapter: Box<dyn ManagerIntegrationAdapter>,
+) -> Result<(), RegistryError> {
+    let id = adapter.id();
+
+    registry.register(id, adapter)
 }
 
 pub fn built_in_release_decision_evaluators<'a>(
