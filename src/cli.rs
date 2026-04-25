@@ -1,4 +1,5 @@
 use std::env;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use crate::builtins::{
@@ -24,7 +25,12 @@ pub struct CliResponse {
 
 pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
     let mut args = args.into_iter();
-    let _program = args.next();
+    let program = args.next().unwrap_or_default();
+    let invocation_program_path = PathBuf::from(&program);
+
+    if let Some(manager_id) = manager_id_from_program(&program) {
+        return run_manager(manager_id, args.collect(), invocation_program_path);
+    }
 
     match args.next() {
         None => CliResponse {
@@ -42,11 +48,24 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
             stdout: format!("lfg {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
-        Some(argument) => run_manager(&argument, args.collect()),
+        Some(argument) => run_manager(&argument, args.collect(), invocation_program_path),
     }
 }
 
-fn run_manager(manager_id: &str, args: Vec<String>) -> CliResponse {
+fn manager_id_from_program(program: &str) -> Option<&str> {
+    let program_name = Path::new(program).file_name()?.to_str()?;
+    let registry = built_in_manager_adapters().ok()?;
+
+    registry.get(program_name).ok()?;
+
+    Some(program_name)
+}
+
+fn run_manager(
+    manager_id: &str,
+    args: Vec<String>,
+    invocation_program_path: PathBuf,
+) -> CliResponse {
     let registry = match built_in_manager_adapters() {
         Ok(registry) => registry,
         Err(_) => return adapter_unavailable_response(manager_id),
@@ -57,7 +76,7 @@ fn run_manager(manager_id: &str, args: Vec<String>) -> CliResponse {
     };
 
     match adapter.parse_install(&args) {
-        Ok(request) => evaluate_manager_request(adapter.as_ref(), request),
+        Ok(request) => evaluate_manager_request(adapter.as_ref(), request, invocation_program_path),
         Err(error) => manager_parse_error_response(manager_id, error),
     }
 }
@@ -65,6 +84,7 @@ fn run_manager(manager_id: &str, args: Vec<String>) -> CliResponse {
 fn evaluate_manager_request(
     adapter: &dyn ManagerIntegrationAdapter,
     request: InstallRequest,
+    invocation_program_path: PathBuf,
 ) -> CliResponse {
     let resolver_registry = match built_in_release_resolvers(AdapterConfig::from_env()) {
         Ok(registry) => registry,
@@ -100,7 +120,8 @@ fn evaluate_manager_request(
     );
     let verdict = aggregate_verdicts(&outcomes);
     if verdict == Verdict::Pass {
-        return execute_manager_request(adapter, &request, &ProcessCommandExecutor);
+        let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
+        return execute_manager_request(adapter, &request, &executor);
     }
 
     let (exit_code, stderr) = cli_result(adapter.id(), request.operation, &outcomes, verdict);
@@ -348,5 +369,17 @@ mod tests {
         assert_eq!(response.exit_code, 1);
         assert!(response.stdout.is_empty());
         assert_eq!(response.stderr, "lfg: unknown argument: --bad\n");
+    }
+
+    #[test]
+    fn shim_invocation_uses_program_name_as_manager() {
+        let response = run(["/tmp/npm".to_owned(), "install".to_owned()]);
+
+        assert_eq!(response.exit_code, 1);
+        assert!(response.stdout.is_empty());
+        assert_eq!(
+            response.stderr,
+            "lfg: npm install needs at least one package\n"
+        );
     }
 }

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::os::unix::fs::symlink;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -54,6 +55,27 @@ fn run_lfg_with_registry_now_and_env(
     command.output().expect("run lfg binary")
 }
 
+fn run_program_with_registry_now_and_env(
+    program: &Path,
+    args: &[&str],
+    registry_base_url: &str,
+    now_unix_seconds: u64,
+    envs: &[(&str, String)],
+) -> std::process::Output {
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .env("LFG_NPM_REGISTRY_URL", registry_base_url)
+        .env("LFG_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
+        .env("LFG_REVIEW_PROVIDER", "none");
+
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+
+    command.output().expect("run lfg shim")
+}
+
 fn temp_test_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -77,6 +99,13 @@ fn write_fake_npm_bin(dir: &Path) {
     fs::set_permissions(npm_path, permissions).expect("mark fake npm executable");
 }
 
+fn write_lfg_shim(dir: &Path, name: &str) -> PathBuf {
+    fs::create_dir_all(dir).expect("create shim bin dir");
+    let shim_path = dir.join(name);
+    symlink(env!("CARGO_BIN_EXE_lfg"), &shim_path).expect("create lfg shim symlink");
+    shim_path
+}
+
 fn write_fake_claude_bin(dir: &Path, provider_output: &str) {
     fs::create_dir_all(dir).expect("create fake bin dir");
     let claude_path = dir.join("claude");
@@ -95,8 +124,15 @@ fn write_fake_claude_bin(dir: &Path, provider_output: &str) {
 }
 
 fn path_with_fake_bin(bin_dir: &Path) -> String {
+    path_with_bin_dirs(&[bin_dir])
+}
+
+fn path_with_bin_dirs(bin_dirs: &[&Path]) -> String {
     let existing = std::env::var_os("PATH").unwrap_or_default();
-    let paths = std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(&existing));
+    let paths = bin_dirs
+        .iter()
+        .map(|path| (*path).to_path_buf())
+        .chain(std::env::split_paths(&existing));
     std::env::join_paths(paths)
         .expect("join PATH")
         .to_string_lossy()
@@ -455,6 +491,51 @@ fn explicit_npm_install_uses_configured_review_age_threshold() {
     assert_eq!(requests.len(), 3);
 
     fs::remove_dir_all(temp_dir).expect("remove fake threshold temp dir");
+}
+
+#[test]
+fn shim_npm_install_detects_manager_from_argv0_and_skips_shim_for_real_npm() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+    let temp_dir = temp_test_dir("lfg-shim-npm");
+    let shim_bin_dir = temp_dir.join("shim-bin");
+    let real_bin_dir = temp_dir.join("real-bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    let shim_path = write_lfg_shim(&shim_bin_dir, "npm");
+    write_fake_npm_bin(&real_bin_dir);
+
+    let output = run_program_with_registry_now_and_env(
+        &shim_path,
+        &["install", "recent-package"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_bin_dirs(&[&shim_bin_dir, &real_bin_dir])),
+            (
+                "LFG_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake npm stdout\n"
+    );
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("stderr is utf-8"),
+        "fake npm stderr\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
+        "install\nrecent-package\n"
+    );
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0].starts_with("GET /recent-package HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove shim temp dir");
 }
 
 #[test]
