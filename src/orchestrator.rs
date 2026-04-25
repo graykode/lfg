@@ -3,6 +3,7 @@ use crate::verdict::Verdict;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReviewUnavailableReason {
+    RegistryFailure,
     ProviderFailure,
     ProviderTimeout,
     DiffFailure,
