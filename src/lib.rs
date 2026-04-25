@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod builtins;
 pub mod cli;
 pub mod install_request;
 pub mod npm;

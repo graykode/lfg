@@ -6,7 +6,7 @@ use crate::npm_policy::{decide_resolved_npm_releases, NpmPolicyError};
 use crate::orchestrator::{PackageOutcome, ReviewUnavailableReason};
 use crate::policy::{AskReason, ReviewDecision, ReviewPolicy};
 
-pub fn evaluate_npm_install_request<R: EcosystemReleaseResolver>(
+pub fn evaluate_npm_install_request<R: EcosystemReleaseResolver + ?Sized>(
     request: &InstallRequest,
     resolver: &R,
     policy: &ReviewPolicy,

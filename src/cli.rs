@@ -1,9 +1,8 @@
 use std::env;
 use std::time::{Duration, SystemTime};
 
-use crate::adapters::{ManagerAdapterError, ManagerIntegrationAdapter};
-use crate::npm::NpmManagerAdapter;
-use crate::npm_registry::{NpmHttpPackumentClient, NpmRegistryResolver};
+use crate::adapters::ManagerAdapterError;
+use crate::builtins::{built_in_manager_adapters, built_in_release_resolvers, AdapterConfig};
 use crate::npm_review::evaluate_npm_install_request;
 use crate::orchestrator::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::policy::{AskReason, ReviewPolicy};
@@ -46,7 +45,16 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
 }
 
 fn run_npm(args: Vec<String>) -> CliResponse {
-    match NpmManagerAdapter.parse_install(&args) {
+    let registry = match built_in_manager_adapters() {
+        Ok(registry) => registry,
+        Err(_) => return adapter_unavailable_response("npm"),
+    };
+    let adapter = match registry.get("npm") {
+        Ok(adapter) => adapter,
+        Err(_) => return adapter_unavailable_response("npm"),
+    };
+
+    match adapter.parse_install(&args) {
         Ok(request) => evaluate_npm_request(request),
         Err(ManagerAdapterError::MissingCommand) => CliResponse {
             exit_code: 1,
@@ -67,10 +75,19 @@ fn run_npm(args: Vec<String>) -> CliResponse {
 }
 
 fn evaluate_npm_request(request: crate::install_request::InstallRequest) -> CliResponse {
-    let resolver = NpmRegistryResolver::new(NpmHttpPackumentClient::new(npm_registry_base_url()));
+    let registry = match built_in_release_resolvers(AdapterConfig {
+        npm_registry_base_url: npm_registry_base_url(),
+    }) {
+        Ok(registry) => registry,
+        Err(_) => return resolver_unavailable_response("npm"),
+    };
+    let resolver = match registry.get("npm-registry") {
+        Ok(resolver) => resolver,
+        Err(_) => return resolver_unavailable_response("npm"),
+    };
     let outcomes = evaluate_npm_install_request(
         &request,
-        &resolver,
+        resolver.as_ref(),
         &ReviewPolicy::default(),
         current_time(),
     );
@@ -81,6 +98,22 @@ fn evaluate_npm_request(request: crate::install_request::InstallRequest) -> CliR
         exit_code,
         stdout: String::new(),
         stderr,
+    }
+}
+
+fn adapter_unavailable_response(manager_id: &str) -> CliResponse {
+    CliResponse {
+        exit_code: Verdict::Ask.exit_code(),
+        stdout: String::new(),
+        stderr: format!("lfg: {manager_id} adapter is unavailable; install is paused.\n"),
+    }
+}
+
+fn resolver_unavailable_response(manager_id: &str) -> CliResponse {
+    CliResponse {
+        exit_code: Verdict::Ask.exit_code(),
+        stdout: String::new(),
+        stderr: format!("lfg: {manager_id} resolver is unavailable; install is paused.\n"),
     }
 }
 
