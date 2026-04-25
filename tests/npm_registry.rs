@@ -1,7 +1,10 @@
+use lfg::adapters::{
+    ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
+    ResolvedPackageReleases,
+};
 use lfg::install_request::InstallTarget;
 use lfg::npm_registry::{
-    resolve_packument_releases, NpmFetchError, NpmPackumentClient, NpmRegistryError,
-    NpmRegistryResolver, NpmRelease, NpmResolveError, ResolvedNpmReleases,
+    resolve_packument_releases, NpmFetchError, NpmPackumentClient, NpmRegistryResolver,
 };
 
 const PACKUMENT: &str = r#"{
@@ -39,17 +42,21 @@ const PACKUMENT: &str = r#"{
 fn resolves_latest_target_and_previous_published_release() {
     assert_eq!(
         resolve_packument_releases(PACKUMENT, "left-pad"),
-        Ok(ResolvedNpmReleases {
+        Ok(ResolvedPackageReleases {
             package_name: "left-pad".to_owned(),
-            target: NpmRelease {
+            target: ResolvedPackageRelease {
                 version: "1.1.0".to_owned(),
                 published_at: "2026-04-23T00:00:00.000Z".to_owned(),
-                tarball_url: "https://registry.npmjs.org/left-pad/-/left-pad-1.1.0.tgz".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://registry.npmjs.org/left-pad/-/left-pad-1.1.0.tgz".to_owned(),
+                },
             },
-            previous: NpmRelease {
+            previous: ResolvedPackageRelease {
                 version: "1.2.0".to_owned(),
                 published_at: "2026-04-22T00:00:00.000Z".to_owned(),
-                tarball_url: "https://registry.npmjs.org/left-pad/-/left-pad-1.2.0.tgz".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://registry.npmjs.org/left-pad/-/left-pad-1.2.0.tgz".to_owned(),
+                },
             },
         })
     );
@@ -81,7 +88,7 @@ fn reports_missing_previous_release() {
 
     assert_eq!(
         resolve_packument_releases(packument, "one-version"),
-        Err(NpmResolveError::MissingPreviousRelease)
+        Err(ResolveError::MissingPreviousRelease)
     );
 }
 
@@ -89,7 +96,7 @@ fn reports_missing_previous_release() {
 fn reports_missing_target_version() {
     assert_eq!(
         resolve_packument_releases(PACKUMENT, "left-pad@9.9.9"),
-        Err(NpmResolveError::MissingTargetVersion("9.9.9".to_owned()))
+        Err(ResolveError::MissingTargetVersion("9.9.9".to_owned()))
     );
 }
 
@@ -118,7 +125,7 @@ fn resolver_fetches_packument_by_package_name_and_resolves_target_spec() {
     });
 
     let resolved = resolver
-        .resolve_target(&InstallTarget {
+        .resolve(&InstallTarget {
             spec: "left-pad@1.2.0".to_owned(),
         })
         .expect("target should resolve");
@@ -136,7 +143,7 @@ fn resolver_uses_scoped_package_name_without_version_for_fetch() {
     });
 
     let resolved = resolver
-        .resolve_target(&InstallTarget {
+        .resolve(&InstallTarget {
             spec: "@scope/pkg@1.1.0".to_owned(),
         })
         .expect("scoped target should resolve");
@@ -153,11 +160,11 @@ fn resolver_maps_fetch_errors() {
     });
 
     assert_eq!(
-        resolver.resolve_target(&InstallTarget {
+        resolver.resolve(&InstallTarget {
             spec: "left-pad".to_owned()
         }),
-        Err(NpmRegistryError::Fetch(NpmFetchError::Unavailable(
+        Err(ResolveError::RegistryUnavailable(
             "unexpected package name: left-pad".to_owned()
-        )))
+        ))
     );
 }

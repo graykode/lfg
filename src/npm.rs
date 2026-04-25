@@ -1,19 +1,26 @@
+use crate::adapters::{ManagerAdapterError, ManagerIntegrationAdapter};
 use crate::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NpmParseError {
-    MissingCommand,
-    MissingPackage,
-    UnsupportedCommand(String),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NpmManagerAdapter;
+
+impl ManagerIntegrationAdapter for NpmManagerAdapter {
+    fn id(&self) -> &'static str {
+        "npm"
+    }
+
+    fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
+        parse_npm_install(args)
+    }
 }
 
-pub fn parse_npm_install(args: &[String]) -> Result<InstallRequest, NpmParseError> {
+pub fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
     let Some(command) = args.first() else {
-        return Err(NpmParseError::MissingCommand);
+        return Err(ManagerAdapterError::MissingCommand);
     };
 
     if command != "install" && command != "i" {
-        return Err(NpmParseError::UnsupportedCommand(command.to_owned()));
+        return Err(ManagerAdapterError::UnsupportedCommand(command.to_owned()));
     }
 
     let targets: Vec<InstallTarget> = args
@@ -26,7 +33,7 @@ pub fn parse_npm_install(args: &[String]) -> Result<InstallRequest, NpmParseErro
         .collect();
 
     if targets.is_empty() {
-        return Err(NpmParseError::MissingPackage);
+        return Err(ManagerAdapterError::MissingPackage);
     }
 
     Ok(InstallRequest {

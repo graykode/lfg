@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use crate::npm_registry::ResolvedNpmReleases;
+use crate::adapters::ResolvedPackageReleases;
 use crate::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,7 +13,7 @@ pub enum NpmPolicyError {
 }
 
 pub fn release_facts_from_resolved_npm_releases(
-    releases: &ResolvedNpmReleases,
+    releases: &ResolvedPackageReleases,
     now: SystemTime,
 ) -> Result<ReleaseFacts, NpmPolicyError> {
     let published_at = parse_target_publish_time(&releases.target.published_at)?;
@@ -40,7 +40,7 @@ pub fn release_facts_from_resolved_npm_releases(
 
 pub fn decide_resolved_npm_releases(
     policy: &ReviewPolicy,
-    releases: &ResolvedNpmReleases,
+    releases: &ResolvedPackageReleases,
     now: SystemTime,
 ) -> Result<ReviewDecision, NpmPolicyError> {
     let facts = release_facts_from_resolved_npm_releases(releases, now)?;

@@ -1,5 +1,6 @@
+use lfg::adapters::ManagerAdapterError;
 use lfg::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::npm::{parse_npm_install, NpmParseError};
+use lfg::npm::parse_npm_install;
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
@@ -40,7 +41,7 @@ fn parses_npm_i_alias() {
 fn rejects_npm_install_without_package() {
     assert_eq!(
         parse_npm_install(&args(&["install"])),
-        Err(NpmParseError::MissingPackage)
+        Err(ManagerAdapterError::MissingPackage)
     );
 }
 
@@ -48,6 +49,6 @@ fn rejects_npm_install_without_package() {
 fn rejects_unsupported_npm_command() {
     assert_eq!(
         parse_npm_install(&args(&["run", "build"])),
-        Err(NpmParseError::UnsupportedCommand("run".to_owned()))
+        Err(ManagerAdapterError::UnsupportedCommand("run".to_owned()))
     );
 }

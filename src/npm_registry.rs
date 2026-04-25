@@ -1,16 +1,14 @@
 use serde_json::Value;
 
+use crate::adapters::{
+    ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
+    ResolvedPackageReleases,
+};
 use crate::install_request::InstallTarget;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmFetchError {
     Unavailable(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NpmRegistryError {
-    Fetch(NpmFetchError),
-    Resolve(NpmResolveError),
 }
 
 pub trait NpmPackumentClient {
@@ -62,51 +60,30 @@ impl<C> NpmRegistryResolver<C> {
     }
 }
 
-impl<C: NpmPackumentClient> NpmRegistryResolver<C> {
-    pub fn resolve_target(
-        &self,
-        target: &InstallTarget,
-    ) -> Result<ResolvedNpmReleases, NpmRegistryError> {
+impl<C: NpmPackumentClient> EcosystemReleaseResolver for NpmRegistryResolver<C> {
+    fn id(&self) -> &'static str {
+        "npm-registry"
+    }
+
+    fn resolve(&self, target: &InstallTarget) -> Result<ResolvedPackageReleases, ResolveError> {
         let (package_name, _) = split_npm_spec(&target.spec);
         let packument = self
             .client
             .fetch_packument(package_name)
-            .map_err(NpmRegistryError::Fetch)?;
+            .map_err(|error| match error {
+                NpmFetchError::Unavailable(message) => ResolveError::RegistryUnavailable(message),
+            })?;
 
-        resolve_packument_releases(&packument, &target.spec).map_err(NpmRegistryError::Resolve)
+        resolve_packument_releases(&packument, &target.spec)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NpmRelease {
-    pub version: String,
-    pub published_at: String,
-    pub tarball_url: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolvedNpmReleases {
-    pub package_name: String,
-    pub target: NpmRelease,
-    pub previous: NpmRelease,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NpmResolveError {
-    InvalidPackument,
-    MissingLatestDistTag,
-    MissingTargetVersion(String),
-    MissingPublishTime(String),
-    MissingTarball(String),
-    MissingPreviousRelease,
 }
 
 pub fn resolve_packument_releases(
     packument_json: &str,
     target_spec: &str,
-) -> Result<ResolvedNpmReleases, NpmResolveError> {
+) -> Result<ResolvedPackageReleases, ResolveError> {
     let packument: Value =
-        serde_json::from_str(packument_json).map_err(|_| NpmResolveError::InvalidPackument)?;
+        serde_json::from_str(packument_json).map_err(|_| ResolveError::InvalidMetadata)?;
     let (spec_package_name, explicit_version) = split_npm_spec(target_spec);
     let package_name = packument
         .get("name")
@@ -118,14 +95,14 @@ pub fn resolve_packument_releases(
         None => packument
             .pointer("/dist-tags/latest")
             .and_then(Value::as_str)
-            .ok_or(NpmResolveError::MissingLatestDistTag)?
+            .ok_or(ResolveError::MissingLatestDistTag)?
             .to_owned(),
     };
 
     let target = read_release(&packument, &target_version)?;
     let previous = previous_release(&packument, &target)?;
 
-    Ok(ResolvedNpmReleases {
+    Ok(ResolvedPackageReleases {
         package_name,
         target,
         previous,
@@ -157,11 +134,14 @@ fn encode_package_name_for_registry_path(package_name: &str) -> String {
     package_name.replace('/', "%2F")
 }
 
-fn previous_release(packument: &Value, target: &NpmRelease) -> Result<NpmRelease, NpmResolveError> {
+fn previous_release(
+    packument: &Value,
+    target: &ResolvedPackageRelease,
+) -> Result<ResolvedPackageRelease, ResolveError> {
     let versions = packument
         .get("versions")
         .and_then(Value::as_object)
-        .ok_or_else(|| NpmResolveError::MissingTargetVersion(target.version.clone()))?;
+        .ok_or_else(|| ResolveError::MissingTargetVersion(target.version.clone()))?;
     let mut previous_version: Option<&str> = None;
     let mut previous_published_at: Option<&str> = None;
 
@@ -181,36 +161,36 @@ fn previous_release(packument: &Value, target: &NpmRelease) -> Result<NpmRelease
         }
     }
 
-    let version = previous_version.ok_or(NpmResolveError::MissingPreviousRelease)?;
+    let version = previous_version.ok_or(ResolveError::MissingPreviousRelease)?;
     read_release(packument, version)
 }
 
-fn read_release(packument: &Value, version: &str) -> Result<NpmRelease, NpmResolveError> {
+fn read_release(packument: &Value, version: &str) -> Result<ResolvedPackageRelease, ResolveError> {
     let versions = packument
         .get("versions")
         .and_then(Value::as_object)
-        .ok_or_else(|| NpmResolveError::MissingTargetVersion(version.to_owned()))?;
+        .ok_or_else(|| ResolveError::MissingTargetVersion(version.to_owned()))?;
     if !versions.contains_key(version) {
-        return Err(NpmResolveError::MissingTargetVersion(version.to_owned()));
+        return Err(ResolveError::MissingTargetVersion(version.to_owned()));
     }
 
     let published_at = publish_time(packument, version)?.to_owned();
     let tarball_url = packument
         .pointer(&format!("/versions/{version}/dist/tarball"))
         .and_then(Value::as_str)
-        .ok_or_else(|| NpmResolveError::MissingTarball(version.to_owned()))?
+        .ok_or_else(|| ResolveError::MissingTarball(version.to_owned()))?
         .to_owned();
 
-    Ok(NpmRelease {
+    Ok(ResolvedPackageRelease {
         version: version.to_owned(),
         published_at,
-        tarball_url,
+        archive: ArchiveRef { url: tarball_url },
     })
 }
 
-fn publish_time<'a>(packument: &'a Value, version: &str) -> Result<&'a str, NpmResolveError> {
+fn publish_time<'a>(packument: &'a Value, version: &str) -> Result<&'a str, ResolveError> {
     packument
         .pointer(&format!("/time/{version}"))
         .and_then(Value::as_str)
-        .ok_or_else(|| NpmResolveError::MissingPublishTime(version.to_owned()))
+        .ok_or_else(|| ResolveError::MissingPublishTime(version.to_owned()))
 }

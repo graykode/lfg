@@ -1,16 +1,14 @@
 use std::time::SystemTime;
 
+use crate::adapters::{EcosystemReleaseResolver, ResolveError};
 use crate::install_request::InstallRequest;
 use crate::npm_policy::{decide_resolved_npm_releases, NpmPolicyError};
-use crate::npm_registry::{
-    NpmPackumentClient, NpmRegistryError, NpmRegistryResolver, NpmResolveError,
-};
 use crate::orchestrator::{PackageOutcome, ReviewUnavailableReason};
 use crate::policy::{AskReason, ReviewDecision, ReviewPolicy};
 
-pub fn evaluate_npm_install_request<C: NpmPackumentClient>(
+pub fn evaluate_npm_install_request<R: EcosystemReleaseResolver>(
     request: &InstallRequest,
-    resolver: &NpmRegistryResolver<C>,
+    resolver: &R,
     policy: &ReviewPolicy,
     now: SystemTime,
 ) -> Vec<PackageOutcome> {
@@ -18,7 +16,7 @@ pub fn evaluate_npm_install_request<C: NpmPackumentClient>(
         .targets
         .iter()
         .map(|target| {
-            let releases = match resolver.resolve_target(target) {
+            let releases = match resolver.resolve(target) {
                 Ok(releases) => releases,
                 Err(error) => return outcome_from_registry_error(error),
             };
@@ -39,19 +37,19 @@ fn outcome_from_policy_decision(decision: ReviewDecision) -> PackageOutcome {
     }
 }
 
-fn outcome_from_registry_error(error: NpmRegistryError) -> PackageOutcome {
+fn outcome_from_registry_error(error: ResolveError) -> PackageOutcome {
     match error {
-        NpmRegistryError::Resolve(NpmResolveError::MissingPreviousRelease) => {
+        ResolveError::MissingPreviousRelease => {
             PackageOutcome::PolicyAsk(AskReason::MissingPreviousRelease)
         }
-        NpmRegistryError::Resolve(NpmResolveError::MissingPublishTime(_)) => {
+        ResolveError::MissingPublishTime(_) => {
             PackageOutcome::PolicyAsk(AskReason::MissingTargetPublishTime)
         }
-        NpmRegistryError::Fetch(_)
-        | NpmRegistryError::Resolve(NpmResolveError::InvalidPackument)
-        | NpmRegistryError::Resolve(NpmResolveError::MissingLatestDistTag)
-        | NpmRegistryError::Resolve(NpmResolveError::MissingTargetVersion(_))
-        | NpmRegistryError::Resolve(NpmResolveError::MissingTarball(_)) => {
+        ResolveError::RegistryUnavailable(_)
+        | ResolveError::InvalidMetadata
+        | ResolveError::MissingLatestDistTag
+        | ResolveError::MissingTargetVersion(_)
+        | ResolveError::MissingTarball(_) => {
             PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::RegistryFailure)
         }
     }

@@ -1,7 +1,8 @@
 use std::env;
 use std::time::{Duration, SystemTime};
 
-use crate::npm::{parse_npm_install, NpmParseError};
+use crate::adapters::{ManagerAdapterError, ManagerIntegrationAdapter};
+use crate::npm::NpmManagerAdapter;
 use crate::npm_registry::{NpmHttpPackumentClient, NpmRegistryResolver};
 use crate::npm_review::evaluate_npm_install_request;
 use crate::orchestrator::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
@@ -45,19 +46,19 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
 }
 
 fn run_npm(args: Vec<String>) -> CliResponse {
-    match parse_npm_install(&args) {
+    match NpmManagerAdapter.parse_install(&args) {
         Ok(request) => evaluate_npm_request(request),
-        Err(NpmParseError::MissingCommand) => CliResponse {
+        Err(ManagerAdapterError::MissingCommand) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
             stderr: "lfg: npm command is required\n".to_owned(),
         },
-        Err(NpmParseError::MissingPackage) => CliResponse {
+        Err(ManagerAdapterError::MissingPackage) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
             stderr: "lfg: npm install needs at least one package\n".to_owned(),
         },
-        Err(NpmParseError::UnsupportedCommand(command)) => CliResponse {
+        Err(ManagerAdapterError::UnsupportedCommand(command)) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
             stderr: format!("lfg: unsupported npm command: {command}\n"),
