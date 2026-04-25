@@ -1,3 +1,4 @@
+pub mod adapter_protocol;
 pub mod contracts;
 pub mod execution;
 pub mod install_assessment;
@@ -8,6 +9,7 @@ pub mod registry;
 pub mod release_age;
 pub mod verdict;
 
+pub use adapter_protocol::*;
 pub use contracts::*;
 pub use execution::*;
 pub use install_assessment::*;

@@ -126,7 +126,7 @@ construct manager-specific or provider-specific implementations.
 
 ## Future External Adapter Protocol
 
-The long-term extension model should prefer external executable adapters.
+The extension model prefers external executable adapters.
 
 Rationale:
 
@@ -135,13 +135,203 @@ Rationale:
 - JSON over stdin/stdout is auditable and testable.
 - Adapter failures can be mapped cleanly to `ask`.
 
-Future protocol pieces:
+External adapters describe the same logical contracts as built-in adapters.
+They do not own core install assessment, review policy, diff generation,
+provider preference, verdict parsing, command shim behavior, or real package
+manager execution.
 
-- protocol version handshake
-- adapter identity and capabilities
-- JSON request and response schema
-- timeout handling
-- stderr diagnostic policy
-- secret redaction rules
+The process model is one request per process invocation:
 
-Dynamic library loading should not be the default extension path.
+- lfg starts the adapter executable.
+- lfg writes one JSON request to stdin.
+- the adapter writes one JSON response to stdout.
+- stderr is diagnostic text only and must not contain secrets.
+- timeout, non-zero exit, malformed JSON, unsupported protocol versions, and
+  explicit adapter errors map to `ask`.
+
+Dynamic library loading, hosted services, background daemons, and package
+manager lifecycle scripts are not the adapter protocol.
+
+## External Adapter Protocol v1
+
+All messages include:
+
+- `type`: request or response type, using kebab-case
+- `protocol_version`: integer protocol version, currently `1`
+
+The first request should be a handshake:
+
+```json
+{
+  "type": "handshake",
+  "protocol_version": 1,
+  "lfg_version": "0.1.0"
+}
+```
+
+The adapter responds with its identity and capabilities:
+
+```json
+{
+  "type": "handshake-accepted",
+  "protocol_version": 1,
+  "adapter_id": "example-adapter",
+  "capabilities": [
+    { "kind": "manager-integration", "id": "pnpm" },
+    { "kind": "ecosystem-release-resolver", "id": "npm-registry" },
+    { "kind": "llm-adapter", "id": "example-llm" }
+  ]
+}
+```
+
+Capability discovery can also be requested directly:
+
+```json
+{
+  "type": "capabilities",
+  "protocol_version": 1
+}
+```
+
+Response:
+
+```json
+{
+  "type": "capabilities",
+  "protocol_version": 1,
+  "capabilities": [
+    { "kind": "manager-integration", "id": "pnpm" }
+  ]
+}
+```
+
+### Manager Integration Request
+
+Manager adapters parse package-manager CLI semantics. They do not fetch
+registry metadata or decide install behavior.
+
+```json
+{
+  "type": "parse-install",
+  "protocol_version": 1,
+  "manager_id": "pnpm",
+  "args": ["add", "left-pad"]
+}
+```
+
+Successful response:
+
+```json
+{
+  "type": "install-parsed",
+  "protocol_version": 1,
+  "request": {
+    "manager_id": "pnpm",
+    "operation": "add",
+    "targets": [{ "spec": "left-pad" }],
+    "manager_args": ["add", "left-pad"],
+    "release_resolver_id": "npm-registry",
+    "release_decision_evaluator_id": "npm-release-policy"
+  },
+  "real_command": {
+    "program": "pnpm",
+    "args": ["add", "left-pad"]
+  }
+}
+```
+
+### Ecosystem Resolver Request
+
+Ecosystem resolvers return release metadata and source archive references.
+They do not build diffs, call LLMs, or execute package managers.
+
+```json
+{
+  "type": "resolve-release",
+  "protocol_version": 1,
+  "resolver_id": "npm-registry",
+  "target": { "spec": "left-pad" }
+}
+```
+
+Successful response:
+
+```json
+{
+  "type": "release-resolved",
+  "protocol_version": 1,
+  "releases": {
+    "package_name": "left-pad",
+    "target": {
+      "version": "1.1.0",
+      "published_at": "1970-01-02T00:00:00.000Z",
+      "archive": {
+        "url": "https://registry.npmjs.org/left-pad/-/left-pad-1.1.0.tgz"
+      }
+    },
+    "previous": {
+      "version": "1.0.0",
+      "published_at": "1970-01-01T00:00:00.000Z",
+      "archive": {
+        "url": "https://registry.npmjs.org/left-pad/-/left-pad-1.0.0.tgz"
+      }
+    }
+  }
+}
+```
+
+### LLM Adapter Request
+
+LLM adapters execute a provider and return raw provider output. lfg still
+parses the final verdict according to `policy.md`.
+
+```json
+{
+  "type": "review",
+  "protocol_version": 1,
+  "provider_id": "example-llm",
+  "prompt": "review prompt text",
+  "timeout_seconds": 60
+}
+```
+
+Successful response:
+
+```json
+{
+  "type": "review-completed",
+  "protocol_version": 1,
+  "raw_output": "verdict: pass\nreason: reviewed\n"
+}
+```
+
+### Error Mapping
+
+Adapters return explicit errors in this shape:
+
+```json
+{
+  "type": "error",
+  "protocol_version": 1,
+  "code": "unsupported-command",
+  "message": "pnpm command cannot be reviewed safely",
+  "ask": true
+}
+```
+
+Supported error codes:
+
+- `unsupported-protocol-version`
+- `invalid-request`
+- `invalid-response`
+- `unsupported-command`
+- `unsupported-option`
+- `unavailable`
+- `timeout`
+- `failed`
+
+All adapter errors are install pauses. lfg must map them to `ask`, never
+silent pass. If an adapter omits `ask`, returns `ask: false`, exits
+non-zero, times out, writes malformed JSON, or writes a response with the
+wrong `protocol_version`, lfg treats the adapter as failed and pauses the
+install with `ask`.
