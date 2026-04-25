@@ -89,6 +89,10 @@ impl lfg::core::EcosystemReleaseResolver for NeverResolver {
 struct NeverDecisionEvaluator;
 
 impl ReleaseDecisionEvaluator for NeverDecisionEvaluator {
+    fn id(&self) -> &'static str {
+        "never"
+    }
+
     fn decide(
         &self,
         _releases: &lfg::core::ResolvedPackageReleases,

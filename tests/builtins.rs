@@ -2,8 +2,11 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread;
 
-use lfg::builtins::{built_in_manager_adapters, built_in_release_resolvers, AdapterConfig};
-use lfg::core::InstallTarget;
+use lfg::builtins::{
+    built_in_manager_adapters, built_in_release_decision_evaluators, built_in_release_resolvers,
+    AdapterConfig,
+};
+use lfg::core::{InstallTarget, ReviewPolicy};
 
 fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
@@ -35,6 +38,11 @@ fn built_in_manager_registry_contains_npm_adapter() {
 
     let adapter = registry.get("npm").expect("npm manager adapter");
     assert_eq!(adapter.id(), "npm");
+    assert_eq!(adapter.release_resolver_id(), "npm-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "npm-release-policy"
+    );
 
     let request = adapter
         .parse_install(&["install".to_owned(), "left-pad".to_owned()])
@@ -83,4 +91,18 @@ fn built_in_release_resolver_registry_contains_configured_npm_registry_resolver(
 
     let request = server.join().expect("server thread completes");
     assert!(request.starts_with("GET /left-pad HTTP/1.1\r\n"));
+}
+
+#[test]
+fn built_in_release_decision_evaluator_registry_contains_npm_policy() {
+    let policy = ReviewPolicy::default();
+    let registry =
+        built_in_release_decision_evaluators(&policy).expect("built-in evaluators register");
+
+    assert_eq!(registry.available_ids(), vec!["npm-release-policy"]);
+
+    let evaluator = registry
+        .get("npm-release-policy")
+        .expect("npm release decision evaluator");
+    assert_eq!(evaluator.id(), "npm-release-policy");
 }

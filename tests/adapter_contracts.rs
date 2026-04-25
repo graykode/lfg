@@ -43,6 +43,11 @@ fn npm_manager_adapter_implements_common_contract() {
         .expect("npm install should parse");
 
     assert_eq!(adapter.id(), "npm");
+    assert_eq!(adapter.release_resolver_id(), "npm-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "npm-release-policy"
+    );
     assert_eq!(request.manager, PackageManager::Npm);
     assert_eq!(request.operation, InstallOperation::Install);
     assert_eq!(

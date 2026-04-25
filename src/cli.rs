@@ -1,12 +1,16 @@
 use std::env;
 use std::time::{Duration, SystemTime};
 
-use crate::builtins::{built_in_manager_adapters, built_in_release_resolvers, AdapterConfig};
-use crate::core::ManagerAdapterError;
-use crate::core::Verdict;
+use crate::builtins::{
+    built_in_manager_adapters, built_in_release_decision_evaluators, built_in_release_resolvers,
+    AdapterConfig,
+};
 use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
-use crate::core::{AskReason, ReviewPolicy};
-use crate::managers::npm::evaluate_npm_install_request;
+use crate::core::{evaluate_install_request, AskReason};
+use crate::core::{
+    InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter,
+};
+use crate::core::{ReviewPolicy, Verdict};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliResponse {
@@ -35,69 +39,90 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
             stdout: format!("lfg {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
-        Some(argument) if argument == "npm" => run_npm(args.collect()),
-        Some(argument) => CliResponse {
-            exit_code: 1,
-            stdout: String::new(),
-            stderr: format!("lfg: unknown argument: {argument}\n"),
-        },
+        Some(argument) => run_manager(&argument, args.collect()),
     }
 }
 
-fn run_npm(args: Vec<String>) -> CliResponse {
+fn run_manager(manager_id: &str, args: Vec<String>) -> CliResponse {
     let registry = match built_in_manager_adapters() {
         Ok(registry) => registry,
-        Err(_) => return adapter_unavailable_response("npm"),
+        Err(_) => return adapter_unavailable_response(manager_id),
     };
-    let adapter = match registry.get("npm") {
+    let adapter = match registry.get(manager_id) {
         Ok(adapter) => adapter,
-        Err(_) => return adapter_unavailable_response("npm"),
+        Err(_) => return unknown_argument_response(manager_id),
     };
 
     match adapter.parse_install(&args) {
-        Ok(request) => evaluate_npm_request(request),
-        Err(ManagerAdapterError::MissingCommand) => CliResponse {
-            exit_code: 1,
-            stdout: String::new(),
-            stderr: "lfg: npm command is required\n".to_owned(),
-        },
-        Err(ManagerAdapterError::MissingPackage) => CliResponse {
-            exit_code: 1,
-            stdout: String::new(),
-            stderr: "lfg: npm install needs at least one package\n".to_owned(),
-        },
-        Err(ManagerAdapterError::UnsupportedCommand(command)) => CliResponse {
-            exit_code: 1,
-            stdout: String::new(),
-            stderr: format!("lfg: unsupported npm command: {command}\n"),
-        },
+        Ok(request) => evaluate_manager_request(adapter.as_ref(), request),
+        Err(error) => manager_parse_error_response(manager_id, error),
     }
 }
 
-fn evaluate_npm_request(request: crate::core::InstallRequest) -> CliResponse {
-    let registry = match built_in_release_resolvers(AdapterConfig {
-        npm_registry_base_url: npm_registry_base_url(),
-    }) {
+fn evaluate_manager_request(
+    adapter: &dyn ManagerIntegrationAdapter,
+    request: InstallRequest,
+) -> CliResponse {
+    let resolver_registry = match built_in_release_resolvers(AdapterConfig::from_env()) {
         Ok(registry) => registry,
-        Err(_) => return resolver_unavailable_response("npm"),
+        Err(_) => return resolver_unavailable_response(adapter.id()),
     };
-    let resolver = match registry.get("npm-registry") {
+    let resolver = match resolver_registry.get(adapter.release_resolver_id()) {
         Ok(resolver) => resolver,
-        Err(_) => return resolver_unavailable_response("npm"),
+        Err(_) => return resolver_unavailable_response(adapter.id()),
     };
-    let outcomes = evaluate_npm_install_request(
+
+    let policy = ReviewPolicy::default();
+    let evaluator_registry = match built_in_release_decision_evaluators(&policy) {
+        Ok(registry) => registry,
+        Err(_) => return evaluator_unavailable_response(adapter.id()),
+    };
+    let evaluator = match evaluator_registry.get(adapter.release_decision_evaluator_id()) {
+        Ok(evaluator) => evaluator,
+        Err(_) => return evaluator_unavailable_response(adapter.id()),
+    };
+
+    let outcomes = evaluate_install_request(
         &request,
         resolver.as_ref(),
-        &ReviewPolicy::default(),
+        evaluator.as_ref(),
         current_time(),
     );
     let verdict = aggregate_verdicts(&outcomes);
-    let (exit_code, stderr) = npm_cli_result(&outcomes, verdict);
+    let (exit_code, stderr) = cli_result(adapter.id(), request.operation, &outcomes, verdict);
 
     CliResponse {
         exit_code,
         stdout: String::new(),
         stderr,
+    }
+}
+
+fn unknown_argument_response(argument: &str) -> CliResponse {
+    CliResponse {
+        exit_code: 1,
+        stdout: String::new(),
+        stderr: format!("lfg: unknown argument: {argument}\n"),
+    }
+}
+
+fn manager_parse_error_response(manager_id: &str, error: ManagerAdapterError) -> CliResponse {
+    match error {
+        ManagerAdapterError::MissingCommand => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: format!("lfg: {manager_id} command is required\n"),
+        },
+        ManagerAdapterError::MissingPackage => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: format!("lfg: {manager_id} install needs at least one package\n"),
+        },
+        ManagerAdapterError::UnsupportedCommand(command) => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: format!("lfg: unsupported {manager_id} command: {command}\n"),
+        },
     }
 }
 
@@ -109,16 +134,20 @@ fn adapter_unavailable_response(manager_id: &str) -> CliResponse {
     }
 }
 
+fn evaluator_unavailable_response(manager_id: &str) -> CliResponse {
+    CliResponse {
+        exit_code: Verdict::Ask.exit_code(),
+        stdout: String::new(),
+        stderr: format!("lfg: {manager_id} policy evaluator is unavailable; install is paused.\n"),
+    }
+}
+
 fn resolver_unavailable_response(manager_id: &str) -> CliResponse {
     CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
         stderr: format!("lfg: {manager_id} resolver is unavailable; install is paused.\n"),
     }
-}
-
-fn npm_registry_base_url() -> String {
-    env::var("LFG_NPM_REGISTRY_URL").unwrap_or_else(|_| "https://registry.npmjs.org".to_owned())
 }
 
 fn current_time() -> SystemTime {
@@ -129,30 +158,48 @@ fn current_time() -> SystemTime {
         .unwrap_or_else(SystemTime::now)
 }
 
-fn npm_cli_result(outcomes: &[PackageOutcome], verdict: Verdict) -> (i32, String) {
+fn cli_result(
+    manager_id: &str,
+    operation: InstallOperation,
+    outcomes: &[PackageOutcome],
+    verdict: Verdict,
+) -> (i32, String) {
+    let operation = operation_label(operation);
+
     match verdict {
         Verdict::Pass => (
             Verdict::Ask.exit_code(),
-            "lfg: npm review is not required by policy, but npm execution is not wired yet. install is paused.\n"
-                .to_owned(),
+            format!(
+                "lfg: {manager_id} review is not required by policy, but {manager_id} execution is not wired yet. install is paused.\n"
+            ),
         ),
-        Verdict::Ask => (Verdict::Ask.exit_code(), npm_ask_message(outcomes)),
+        Verdict::Ask => (
+            Verdict::Ask.exit_code(),
+            ask_message(manager_id, operation, outcomes),
+        ),
         Verdict::Block => (
             Verdict::Block.exit_code(),
-            "lfg: npm install was blocked by provider review.\n".to_owned(),
+            format!("lfg: {manager_id} {operation} was blocked by provider review.\n"),
         ),
     }
 }
 
-fn npm_ask_message(outcomes: &[PackageOutcome]) -> String {
+fn operation_label(operation: InstallOperation) -> &'static str {
+    match operation {
+        InstallOperation::Install => "install",
+    }
+}
+
+fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -> String {
     if outcomes.iter().any(|outcome| {
         matches!(
             outcome,
             PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::DiffFailure)
         )
     }) {
-        return "lfg: review required for npm install, but archive diff review is not wired yet. install is paused.\n"
-            .to_owned();
+        return format!(
+            "lfg: review required for {manager_id} {operation}, but archive diff review is not wired yet. install is paused.\n"
+        );
     }
 
     if outcomes.iter().any(|outcome| {
@@ -161,7 +208,7 @@ fn npm_ask_message(outcomes: &[PackageOutcome]) -> String {
             PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::RegistryFailure)
         )
     }) {
-        return "lfg: npm registry metadata is unavailable; install is paused.\n".to_owned();
+        return format!("lfg: {manager_id} registry metadata is unavailable; install is paused.\n");
     }
 
     if outcomes.iter().any(|outcome| {
@@ -170,7 +217,9 @@ fn npm_ask_message(outcomes: &[PackageOutcome]) -> String {
             PackageOutcome::PolicyAsk(AskReason::MissingPreviousRelease)
         )
     }) {
-        return "lfg: npm package has no previous release to diff; install is paused.\n".to_owned();
+        return format!(
+            "lfg: {manager_id} package has no previous release to diff; install is paused.\n"
+        );
     }
 
     if outcomes.iter().any(|outcome| {
@@ -179,11 +228,12 @@ fn npm_ask_message(outcomes: &[PackageOutcome]) -> String {
             PackageOutcome::PolicyAsk(AskReason::MissingTargetPublishTime)
         )
     }) {
-        return "lfg: npm package publish time is missing or invalid; install is paused.\n"
-            .to_owned();
+        return format!(
+            "lfg: {manager_id} package publish time is missing or invalid; install is paused.\n"
+        );
     }
 
-    "lfg: npm review could not complete safely; install is paused.\n".to_owned()
+    format!("lfg: {manager_id} review could not complete safely; install is paused.\n")
 }
 
 fn help_text() -> String {

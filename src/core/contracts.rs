@@ -2,6 +2,8 @@ use crate::core::{InstallRequest, InstallTarget};
 
 pub trait ManagerIntegrationAdapter {
     fn id(&self) -> &'static str;
+    fn release_resolver_id(&self) -> &'static str;
+    fn release_decision_evaluator_id(&self) -> &'static str;
     fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError>;
 }
 

@@ -34,6 +34,10 @@ struct StaticDecisionEvaluator {
 }
 
 impl ReleaseDecisionEvaluator for StaticDecisionEvaluator {
+    fn id(&self) -> &'static str {
+        "static"
+    }
+
     fn decide(
         &self,
         releases: &ResolvedPackageReleases,

@@ -9,6 +9,14 @@ impl ManagerIntegrationAdapter for NpmManagerAdapter {
         "npm"
     }
 
+    fn release_resolver_id(&self) -> &'static str {
+        "npm-registry"
+    }
+
+    fn release_decision_evaluator_id(&self) -> &'static str {
+        "npm-release-policy"
+    }
+
     fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
         parse_npm_install(args)
     }

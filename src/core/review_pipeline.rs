@@ -11,6 +11,8 @@ pub enum ReleaseDecisionError {
 }
 
 pub trait ReleaseDecisionEvaluator {
+    fn id(&self) -> &'static str;
+
     fn decide(
         &self,
         releases: &ResolvedPackageReleases,

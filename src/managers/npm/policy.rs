@@ -60,6 +60,10 @@ impl<'a> NpmReleaseDecisionEvaluator<'a> {
 }
 
 impl ReleaseDecisionEvaluator for NpmReleaseDecisionEvaluator<'_> {
+    fn id(&self) -> &'static str {
+        "npm-release-policy"
+    }
+
     fn decide(
         &self,
         releases: &ResolvedPackageReleases,
