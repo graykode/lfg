@@ -1,10 +1,10 @@
 use serde_json::Value;
 
-use crate::adapters::{
+use crate::core::contracts::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use crate::install_request::InstallTarget;
+use crate::core::install_request::InstallTarget;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmFetchError {

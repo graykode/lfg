@@ -3,9 +3,11 @@ use std::io::Write;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use lfg::adapters::{ArchiveRef, ResolvedPackageRelease, ResolvedPackageReleases};
-use lfg::archive_diff::{ArchiveDiffBuilder, ArchiveDiffError, ArchiveFetchError, ArchiveFetcher};
-use lfg::source_diff::UnifiedDiffEngine;
+use lfg::core::contracts::{ArchiveRef, ResolvedPackageRelease, ResolvedPackageReleases};
+use lfg::evidence::archive_diff::{
+    ArchiveDiffBuilder, ArchiveDiffError, ArchiveFetchError, ArchiveFetcher,
+};
+use lfg::evidence::source_diff::UnifiedDiffEngine;
 use tar::{Builder, Header};
 
 #[derive(Debug, Clone)]

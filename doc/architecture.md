@@ -48,6 +48,23 @@ It knows contracts:
 - a verdict parser can convert raw output into `pass`, `ask`, or `block`
 - an install gate can decide whether the real manager is executed
 
+## Code Layout
+
+The Rust code is grouped by role:
+
+```text
+src/
+  core/              shared contracts, policy, verdicts, outcomes, pipeline
+  evidence/          archive reading, archive fetching, source diff creation
+  managers/npm/      npm CLI parsing, npm registry metadata, npm policy glue
+  providers/         provider output parsing and future provider adapters
+  builtins.rs        built-in adapter registry wiring
+  cli.rs             CLI entrypoint behavior
+```
+
+Start in `core/review_pipeline.rs` for the manager-neutral review flow.
+Look in `managers/npm/` only for npm-specific parsing and metadata code.
+
 ## Command Shim
 
 The command shim is the normal product entrypoint.

@@ -2,8 +2,8 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread;
 
-use lfg::adapters::ArchiveRef;
-use lfg::archive_diff::{ArchiveFetcher, HttpArchiveFetcher};
+use lfg::core::contracts::ArchiveRef;
+use lfg::evidence::archive_diff::{ArchiveFetcher, HttpArchiveFetcher};
 
 fn serve_bytes_once(body: &'static [u8]) -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");

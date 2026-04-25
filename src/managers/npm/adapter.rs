@@ -1,5 +1,7 @@
-use crate::adapters::{ManagerAdapterError, ManagerIntegrationAdapter};
-use crate::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use crate::core::contracts::{ManagerAdapterError, ManagerIntegrationAdapter};
+use crate::core::install_request::{
+    InstallOperation, InstallRequest, InstallTarget, PackageManager,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpmManagerAdapter;

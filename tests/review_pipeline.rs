@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use lfg::adapters::{
+use lfg::core::contracts::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use lfg::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::orchestrator::{PackageOutcome, ReviewUnavailableReason};
-use lfg::policy::{AskReason, ReviewDecision, SkipReason};
-use lfg::review_pipeline::{
+use lfg::core::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use lfg::core::outcome::{PackageOutcome, ReviewUnavailableReason};
+use lfg::core::policy::{AskReason, ReviewDecision, SkipReason};
+use lfg::core::review_pipeline::{
     evaluate_install_request, ReleaseDecisionError, ReleaseDecisionEvaluator,
 };
 

@@ -1,6 +1,6 @@
-use lfg::adapters::ManagerAdapterError;
-use lfg::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
-use lfg::npm::parse_npm_install;
+use lfg::core::contracts::ManagerAdapterError;
+use lfg::core::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use lfg::managers::npm::adapter::parse_npm_install;
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()

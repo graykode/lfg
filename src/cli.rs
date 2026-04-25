@@ -1,12 +1,12 @@
 use std::env;
 use std::time::{Duration, SystemTime};
 
-use crate::adapters::ManagerAdapterError;
 use crate::builtins::{built_in_manager_adapters, built_in_release_resolvers, AdapterConfig};
-use crate::npm_review::evaluate_npm_install_request;
-use crate::orchestrator::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
-use crate::policy::{AskReason, ReviewPolicy};
-use crate::verdict::Verdict;
+use crate::core::contracts::ManagerAdapterError;
+use crate::core::outcome::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
+use crate::core::policy::{AskReason, ReviewPolicy};
+use crate::core::verdict::Verdict;
+use crate::managers::npm::review::evaluate_npm_install_request;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliResponse {
@@ -74,7 +74,7 @@ fn run_npm(args: Vec<String>) -> CliResponse {
     }
 }
 
-fn evaluate_npm_request(request: crate::install_request::InstallRequest) -> CliResponse {
+fn evaluate_npm_request(request: crate::core::install_request::InstallRequest) -> CliResponse {
     let registry = match built_in_release_resolvers(AdapterConfig {
         npm_registry_base_url: npm_registry_base_url(),
     }) {

@@ -1,7 +1,7 @@
-use crate::adapters::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
-use crate::npm::NpmManagerAdapter;
-use crate::npm_registry::{NpmHttpPackumentClient, NpmRegistryResolver};
-use crate::registry::{Registry, RegistryError};
+use crate::core::contracts::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
+use crate::core::registry::{Registry, RegistryError};
+use crate::managers::npm::adapter::NpmManagerAdapter;
+use crate::managers::npm::registry::{NpmHttpPackumentClient, NpmRegistryResolver};
 
 pub type ManagerAdapterRegistry = Registry<Box<dyn ManagerIntegrationAdapter>>;
 pub type ReleaseResolverRegistry = Registry<Box<dyn EcosystemReleaseResolver>>;

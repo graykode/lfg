@@ -1,9 +1,9 @@
-use lfg::adapters::{
+use lfg::core::contracts::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
 };
-use lfg::install_request::InstallTarget;
-use lfg::npm_registry::{
+use lfg::core::install_request::InstallTarget;
+use lfg::managers::npm::registry::{
     resolve_packument_releases, NpmFetchError, NpmPackumentClient, NpmRegistryResolver,
 };
 

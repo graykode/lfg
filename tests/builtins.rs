@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use std::thread;
 
 use lfg::builtins::{built_in_manager_adapters, built_in_release_resolvers, AdapterConfig};
-use lfg::install_request::InstallTarget;
+use lfg::core::install_request::InstallTarget;
 
 fn serve_packument_once(packument: &'static str) -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");

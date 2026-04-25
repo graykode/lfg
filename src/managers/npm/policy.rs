@@ -3,9 +3,9 @@ use std::time::{Duration, SystemTime};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use crate::adapters::ResolvedPackageReleases;
-use crate::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy};
-use crate::review_pipeline::{ReleaseDecisionError, ReleaseDecisionEvaluator};
+use crate::core::contracts::ResolvedPackageReleases;
+use crate::core::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy};
+use crate::core::review_pipeline::{ReleaseDecisionError, ReleaseDecisionEvaluator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmPolicyError {

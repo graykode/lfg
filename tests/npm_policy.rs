@@ -1,10 +1,10 @@
 use std::time::{Duration, SystemTime};
 
-use lfg::adapters::{ArchiveRef, ResolvedPackageRelease, ResolvedPackageReleases};
-use lfg::npm_policy::{
+use lfg::core::contracts::{ArchiveRef, ResolvedPackageRelease, ResolvedPackageReleases};
+use lfg::core::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy, SkipReason};
+use lfg::managers::npm::policy::{
     decide_resolved_npm_releases, release_facts_from_resolved_npm_releases, NpmPolicyError,
 };
-use lfg::policy::{ReleaseFacts, ReviewDecision, ReviewPolicy, SkipReason};
 
 fn resolved_releases(target_published_at: &str) -> ResolvedPackageReleases {
     ResolvedPackageReleases {
