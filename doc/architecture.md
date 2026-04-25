@@ -70,8 +70,11 @@ src/
                      crates.io registry metadata and Rust release policy glue
   ecosystems/npm/    npm registry metadata and npm release policy glue
   ecosystems/pypi/   PyPI registry metadata and Python release policy glue
+  ecosystems/rubygems/
+                     RubyGems metadata and Ruby release policy glue
   evidence/          archive reading, archive fetching, source diff creation
   managers/cargo/    cargo CLI parsing
+  managers/gem/      gem CLI parsing
   managers/npm/      npm CLI parsing
   managers/pip/      pip CLI parsing
   managers/pnpm/     pnpm CLI parsing

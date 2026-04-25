@@ -14,7 +14,11 @@ use crate::ecosystems::npm::{
 use crate::ecosystems::pypi::{
     PypiHttpProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
 };
+use crate::ecosystems::rubygems::{
+    RubyGemsHttpVersionsClient, RubyGemsRegistryResolver, RubyReleaseDecisionEvaluator,
+};
 use crate::managers::cargo::CargoManagerAdapter;
+use crate::managers::gem::GemManagerAdapter;
 use crate::managers::npm::NpmManagerAdapter;
 use crate::managers::pip::PipManagerAdapter;
 use crate::managers::pnpm::PnpmManagerAdapter;
@@ -31,6 +35,7 @@ pub struct AdapterConfig {
     pub crates_io_registry_base_url: String,
     pub npm_registry_base_url: String,
     pub pypi_registry_base_url: String,
+    pub rubygems_registry_base_url: String,
 }
 
 impl AdapterConfig {
@@ -42,6 +47,8 @@ impl AdapterConfig {
                 .unwrap_or_else(|_| "https://registry.npmjs.org".to_owned()),
             pypi_registry_base_url: env::var("LFG_PYPI_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://pypi.org".to_owned()),
+            rubygems_registry_base_url: env::var("LFG_RUBYGEMS_REGISTRY_URL")
+                .unwrap_or_else(|_| "https://rubygems.org".to_owned()),
         }
     }
 }
@@ -147,6 +154,11 @@ pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryErr
 
     registry.register(id, adapter)?;
 
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(GemManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
     let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(NpmManagerAdapter);
     let id = adapter.id();
 
@@ -187,6 +199,12 @@ pub fn built_in_release_decision_evaluators<'a>(
 
     let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
         Box::new(PythonReleaseDecisionEvaluator::new(policy));
+    let id = evaluator.id();
+
+    registry.register(id, evaluator)?;
+
+    let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
+        Box::new(RubyReleaseDecisionEvaluator::new(policy));
     let id = evaluator.id();
 
     registry.register(id, evaluator)?;
@@ -276,6 +294,14 @@ pub fn built_in_release_resolvers(
     let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(CratesIoRegistryResolver::new(
         CratesIoHttpCrateClient::new(config.crates_io_registry_base_url.clone()),
         config.crates_io_registry_base_url,
+    ));
+    let id = resolver.id();
+
+    registry.register(id, resolver)?;
+
+    let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(RubyGemsRegistryResolver::new(
+        RubyGemsHttpVersionsClient::new(config.rubygems_registry_base_url.clone()),
+        config.rubygems_registry_base_url,
     ));
     let id = resolver.id();
 

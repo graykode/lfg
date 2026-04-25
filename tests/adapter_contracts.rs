@@ -8,7 +8,11 @@ use lfg::ecosystems::crates_io::{
 };
 use lfg::ecosystems::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 use lfg::ecosystems::pypi::{PypiFetchError, PypiProjectClient, PypiRegistryResolver};
+use lfg::ecosystems::rubygems::{
+    RubyGemsFetchError, RubyGemsRegistryResolver, RubyGemsVersionsClient,
+};
 use lfg::managers::cargo::CargoManagerAdapter;
+use lfg::managers::gem::GemManagerAdapter;
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::pnpm::PnpmManagerAdapter;
@@ -72,6 +76,28 @@ impl NpmPackumentClient for StaticPackumentClient {
 
 struct StaticProjectClient;
 
+struct StaticVersionsClient;
+
+impl RubyGemsVersionsClient for StaticVersionsClient {
+    fn fetch_versions(&self, gem_name: &str) -> Result<String, RubyGemsFetchError> {
+        if gem_name != "rack" {
+            return Err(RubyGemsFetchError::Unavailable(gem_name.to_owned()));
+        }
+
+        Ok(r#"[
+          {
+            "number": "3.0.0",
+            "created_at": "1970-01-02T00:00:00.000Z"
+          },
+          {
+            "number": "2.2.0",
+            "created_at": "1970-01-01T00:00:00.000Z"
+          }
+        ]"#
+        .to_owned())
+    }
+}
+
 impl PypiProjectClient for StaticProjectClient {
     fn fetch_project(&self, package_name: &str) -> Result<String, PypiFetchError> {
         if package_name != "requests" {
@@ -121,6 +147,30 @@ fn cargo_manager_adapter_implements_common_contract() {
         request.targets,
         vec![InstallTarget {
             spec: "serde".to_owned()
+        }]
+    );
+}
+
+#[test]
+fn gem_manager_adapter_implements_common_contract() {
+    let adapter = GemManagerAdapter;
+
+    let request = adapter
+        .parse_install(&["install".to_owned(), "rack".to_owned()])
+        .expect("gem install should parse");
+
+    assert_eq!(adapter.id(), "gem");
+    assert_eq!(adapter.release_resolver_id(), "rubygems-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "ruby-release-policy"
+    );
+    assert_eq!(request.manager, PackageManager::Gem);
+    assert_eq!(request.operation, InstallOperation::Install);
+    assert_eq!(
+        request.targets,
+        vec![InstallTarget {
+            spec: "rack".to_owned()
         }]
     );
 }
@@ -371,6 +421,47 @@ fn pypi_registry_resolver_implements_common_contract() {
 #[test]
 fn pypi_registry_resolver_maps_fetch_failures_to_common_resolve_error() {
     let resolver = PypiRegistryResolver::new(StaticProjectClient);
+
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "missing".to_owned()
+        }),
+        Err(ResolveError::RegistryUnavailable("missing".to_owned()))
+    );
+}
+
+#[test]
+fn rubygems_registry_resolver_implements_common_contract() {
+    let resolver = RubyGemsRegistryResolver::new(StaticVersionsClient, "https://rubygems.org");
+
+    assert_eq!(resolver.id(), "rubygems-registry");
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "rack".to_owned()
+        }),
+        Ok(ResolvedPackageReleases {
+            package_name: "rack".to_owned(),
+            target: ResolvedPackageRelease {
+                version: "3.0.0".to_owned(),
+                published_at: "1970-01-02T00:00:00.000Z".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://rubygems.org/gems/rack-3.0.0.gem".to_owned()
+                },
+            },
+            previous: ResolvedPackageRelease {
+                version: "2.2.0".to_owned(),
+                published_at: "1970-01-01T00:00:00.000Z".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://rubygems.org/gems/rack-2.2.0.gem".to_owned()
+                },
+            },
+        })
+    );
+}
+
+#[test]
+fn rubygems_registry_resolver_maps_fetch_failures_to_common_resolve_error() {
+    let resolver = RubyGemsRegistryResolver::new(StaticVersionsClient, "https://rubygems.org");
 
     assert_eq!(
         resolver.resolve(&InstallTarget {

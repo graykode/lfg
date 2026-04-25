@@ -15,11 +15,16 @@ use lfg::ecosystems::npm::{
 use lfg::ecosystems::pypi::{
     PypiHttpProjectClient, PypiProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
 };
+use lfg::ecosystems::rubygems::{
+    RubyGemsHttpVersionsClient, RubyGemsRegistryResolver, RubyGemsVersionsClient,
+    RubyReleaseDecisionEvaluator,
+};
 use lfg::evidence::{
     read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
     UnifiedDiffEngine,
 };
 use lfg::managers::cargo::CargoManagerAdapter;
+use lfg::managers::gem::GemManagerAdapter;
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::pnpm::PnpmManagerAdapter;
@@ -73,6 +78,10 @@ fn public_modules_are_grouped_by_role() {
     let _ = CratesIoRegistryResolver::new(NeverCrateClient, "https://crates.io");
     let _ = CratesIoHttpCrateClient::new("https://crates.io");
     let _ = RustReleaseDecisionEvaluator::new;
+    let _ = GemManagerAdapter;
+    let _ = RubyGemsRegistryResolver::new(NeverVersionsClient, "https://rubygems.org");
+    let _ = RubyGemsHttpVersionsClient::new("https://rubygems.org");
+    let _ = RubyReleaseDecisionEvaluator::new;
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
     let _ = PnpmManagerAdapter;
@@ -126,6 +135,17 @@ impl NpmPackumentClient for NeverPackumentClient {
 }
 
 struct NeverProjectClient;
+
+struct NeverVersionsClient;
+
+impl RubyGemsVersionsClient for NeverVersionsClient {
+    fn fetch_versions(
+        &self,
+        _gem_name: &str,
+    ) -> Result<String, lfg::ecosystems::rubygems::RubyGemsFetchError> {
+        unreachable!("module layout test does not fetch RubyGems versions")
+    }
+}
 
 impl PypiProjectClient for NeverProjectClient {
     fn fetch_project(

@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageManager {
     Cargo,
+    Gem,
     Npm,
     Pip,
     Pnpm,

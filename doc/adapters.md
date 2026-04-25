@@ -67,6 +67,7 @@ Examples:
 - npm, pnpm, and yarn can share an npm registry resolver.
 - pip and uv can share a PyPI resolver.
 - cargo can use a crates.io resolver.
+- gem can use a RubyGems resolver.
 
 Conceptual shape:
 

@@ -39,7 +39,7 @@ fn built_in_manager_registry_contains_manager_adapters() {
 
     assert_eq!(
         registry.available_ids(),
-        vec!["cargo", "npm", "pip", "pnpm", "uv", "yarn"]
+        vec!["cargo", "gem", "npm", "pip", "pnpm", "uv", "yarn"]
     );
 
     let adapter = registry.get("cargo").expect("cargo manager adapter");
@@ -54,6 +54,19 @@ fn built_in_manager_registry_contains_manager_adapters() {
         .parse_install(&["add".to_owned(), "serde".to_owned()])
         .expect("parse cargo add");
     assert_eq!(request.targets[0].spec, "serde");
+
+    let adapter = registry.get("gem").expect("gem manager adapter");
+    assert_eq!(adapter.id(), "gem");
+    assert_eq!(adapter.release_resolver_id(), "rubygems-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "ruby-release-policy"
+    );
+
+    let request = adapter
+        .parse_install(&["install".to_owned(), "rack".to_owned()])
+        .expect("parse gem install");
+    assert_eq!(request.targets[0].spec, "rack");
 
     let adapter = registry.get("npm").expect("npm manager adapter");
     assert_eq!(adapter.id(), "npm");
@@ -173,19 +186,36 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
         }
       ]
     }"#;
+    let gem_versions = r#"[
+      {
+        "number": "3.0.0",
+        "created_at": "1970-01-02T00:00:00.000Z"
+      },
+      {
+        "number": "2.2.0",
+        "created_at": "1970-01-01T00:00:00.000Z"
+      }
+    ]"#;
     let (crates_io_registry_base_url, crates_io_server) = serve_json_once(crate_metadata);
+    let (rubygems_registry_base_url, rubygems_server) = serve_json_once(gem_versions);
     let (npm_registry_base_url, npm_server) = serve_json_once(packument);
     let (pypi_registry_base_url, pypi_server) = serve_json_once(project);
     let registry = built_in_release_resolvers(AdapterConfig {
         crates_io_registry_base_url,
         npm_registry_base_url,
         pypi_registry_base_url,
+        rubygems_registry_base_url,
     })
     .expect("built-in release resolvers register");
 
     assert_eq!(
         registry.available_ids(),
-        vec!["crates-io-registry", "npm-registry", "pypi-registry"]
+        vec![
+            "crates-io-registry",
+            "npm-registry",
+            "pypi-registry",
+            "rubygems-registry"
+        ]
     );
 
     let resolver = registry
@@ -202,6 +232,21 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
     assert_eq!(releases.package_name, "serde");
     assert_eq!(releases.target.version, "1.0.1");
     assert_eq!(releases.previous.version, "1.0.0");
+
+    let resolver = registry
+        .get("rubygems-registry")
+        .expect("RubyGems registry resolver");
+    assert_eq!(resolver.id(), "rubygems-registry");
+
+    let releases = resolver
+        .resolve(&InstallTarget {
+            spec: "rack".to_owned(),
+        })
+        .expect("resolve gem release");
+
+    assert_eq!(releases.package_name, "rack");
+    assert_eq!(releases.target.version, "3.0.0");
+    assert_eq!(releases.previous.version, "2.2.0");
 
     let resolver = registry.get("npm-registry").expect("npm registry resolver");
     assert_eq!(resolver.id(), "npm-registry");
@@ -239,6 +284,10 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
         .join()
         .expect("crates.io server thread completes");
     assert!(request.starts_with("GET /api/v1/crates/serde HTTP/1.1\r\n"));
+    let request = rubygems_server
+        .join()
+        .expect("RubyGems server thread completes");
+    assert!(request.starts_with("GET /api/v1/versions/rack.json HTTP/1.1\r\n"));
 }
 
 #[test]
@@ -252,6 +301,7 @@ fn built_in_release_decision_evaluator_registry_contains_release_policies() {
         vec![
             "npm-release-policy",
             "python-release-policy",
+            "ruby-release-policy",
             "rust-release-policy"
         ]
     );
@@ -270,6 +320,11 @@ fn built_in_release_decision_evaluator_registry_contains_release_policies() {
         .get("rust-release-policy")
         .expect("rust release decision evaluator");
     assert_eq!(evaluator.id(), "rust-release-policy");
+
+    let evaluator = registry
+        .get("ruby-release-policy")
+        .expect("ruby release decision evaluator");
+    assert_eq!(evaluator.id(), "ruby-release-policy");
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -612,6 +612,7 @@ Options:
 
 Examples:
   lfg cargo add <crate>
+  lfg gem install <gem>
   lfg npm install <package>
   lfg pnpm add <package>
   lfg yarn add <package>
