@@ -11,6 +11,20 @@ pub trait ArchiveFetcher {
     fn fetch(&self, archive: &ArchiveRef) -> Result<Vec<u8>, ArchiveFetchError>;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HttpArchiveFetcher;
+
+impl ArchiveFetcher for HttpArchiveFetcher {
+    fn fetch(&self, archive: &ArchiveRef) -> Result<Vec<u8>, ArchiveFetchError> {
+        ureq::get(&archive.url)
+            .call()
+            .map_err(|error| ArchiveFetchError::Unavailable(error.to_string()))?
+            .body_mut()
+            .read_to_vec()
+            .map_err(|error| ArchiveFetchError::Unavailable(error.to_string()))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArchiveDiffError {
     Fetch(ArchiveFetchError),
