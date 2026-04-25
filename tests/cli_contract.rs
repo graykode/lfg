@@ -75,6 +75,26 @@ fn run_lfg_with_pypi_registry_now_and_env(
     command.output().expect("run lfg binary")
 }
 
+fn run_lfg_with_crates_io_registry_now_and_env(
+    args: &[&str],
+    registry_base_url: &str,
+    now_unix_seconds: u64,
+    envs: &[(&str, String)],
+) -> std::process::Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lfg"));
+    command
+        .args(args)
+        .env("LFG_CRATES_IO_REGISTRY_URL", registry_base_url)
+        .env("LFG_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
+        .env("LFG_REVIEW_PROVIDER", "none");
+
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+
+    command.output().expect("run lfg binary")
+}
+
 fn run_program_with_registry_now_and_env(
     program: &Path,
     args: &[&str],
@@ -117,6 +137,21 @@ fn write_fake_npm_bin(dir: &Path) {
         .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(npm_path, permissions).expect("mark fake npm executable");
+}
+
+fn write_fake_cargo_bin(dir: &Path) {
+    fs::create_dir_all(dir).expect("create fake bin dir");
+    let cargo_path = dir.join("cargo");
+    fs::write(
+        &cargo_path,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LFG_FAKE_CARGO_ARGS\"\nprintf 'fake cargo stdout\\n'\nprintf 'fake cargo stderr\\n' >&2\n",
+    )
+    .expect("write fake cargo");
+    let mut permissions = fs::metadata(&cargo_path)
+        .expect("read fake cargo metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(cargo_path, permissions).expect("mark fake cargo executable");
 }
 
 fn write_fake_pip_bin(dir: &Path) {
@@ -930,6 +965,62 @@ fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
     assert!(request.starts_with("GET /old-package HTTP/1.1\r\n"));
 
     fs::remove_dir_all(temp_dir).expect("remove fake npm temp dir");
+}
+
+#[test]
+fn explicit_old_cargo_add_executes_real_cargo_after_policy_pass() {
+    let metadata = r#"{
+      "crate": { "id": "serde", "max_version": "1.0.1" },
+      "versions": [
+        {
+          "num": "1.0.1",
+          "created_at": "1970-01-02T00:00:00+00:00",
+          "dl_path": "/api/v1/crates/serde/1.0.1/download"
+        },
+        {
+          "num": "1.0.0",
+          "created_at": "1970-01-01T00:00:00+00:00",
+          "dl_path": "/api/v1/crates/serde/1.0.0/download"
+        }
+      ]
+    }"#;
+    let (registry_base_url, server) = serve_packument_once(metadata);
+    let temp_dir = temp_test_dir("lfg-fake-cargo");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("cargo-args.txt");
+    write_fake_cargo_bin(&fake_bin_dir);
+
+    let output = run_lfg_with_crates_io_registry_now_and_env(
+        &["cargo", "add", "serde"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "LFG_FAKE_CARGO_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake cargo stdout\n"
+    );
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("stderr is utf-8"),
+        "fake cargo stderr\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake cargo args are captured"),
+        "add\nserde\n"
+    );
+
+    let request = server.join().expect("server thread completes");
+    assert!(request.starts_with("GET /api/v1/crates/serde HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove fake cargo temp dir");
 }
 
 #[test]

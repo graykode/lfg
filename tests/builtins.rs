@@ -39,8 +39,21 @@ fn built_in_manager_registry_contains_manager_adapters() {
 
     assert_eq!(
         registry.available_ids(),
-        vec!["npm", "pip", "pnpm", "uv", "yarn"]
+        vec!["cargo", "npm", "pip", "pnpm", "uv", "yarn"]
     );
+
+    let adapter = registry.get("cargo").expect("cargo manager adapter");
+    assert_eq!(adapter.id(), "cargo");
+    assert_eq!(adapter.release_resolver_id(), "crates-io-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "rust-release-policy"
+    );
+
+    let request = adapter
+        .parse_install(&["add".to_owned(), "serde".to_owned()])
+        .expect("parse cargo add");
+    assert_eq!(request.targets[0].spec, "serde");
 
     let adapter = registry.get("npm").expect("npm manager adapter");
     assert_eq!(adapter.id(), "npm");
@@ -145,9 +158,26 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
         ]
       }
     }"#;
+    let crate_metadata = r#"{
+      "crate": { "id": "serde", "max_version": "1.0.1" },
+      "versions": [
+        {
+          "num": "1.0.1",
+          "created_at": "1970-01-02T00:00:00+00:00",
+          "dl_path": "/api/v1/crates/serde/1.0.1/download"
+        },
+        {
+          "num": "1.0.0",
+          "created_at": "1970-01-01T00:00:00+00:00",
+          "dl_path": "/api/v1/crates/serde/1.0.0/download"
+        }
+      ]
+    }"#;
+    let (crates_io_registry_base_url, crates_io_server) = serve_json_once(crate_metadata);
     let (npm_registry_base_url, npm_server) = serve_json_once(packument);
     let (pypi_registry_base_url, pypi_server) = serve_json_once(project);
     let registry = built_in_release_resolvers(AdapterConfig {
+        crates_io_registry_base_url,
         npm_registry_base_url,
         pypi_registry_base_url,
     })
@@ -155,8 +185,23 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
 
     assert_eq!(
         registry.available_ids(),
-        vec!["npm-registry", "pypi-registry"]
+        vec!["crates-io-registry", "npm-registry", "pypi-registry"]
     );
+
+    let resolver = registry
+        .get("crates-io-registry")
+        .expect("crates.io registry resolver");
+    assert_eq!(resolver.id(), "crates-io-registry");
+
+    let releases = resolver
+        .resolve(&InstallTarget {
+            spec: "serde".to_owned(),
+        })
+        .expect("resolve crate release");
+
+    assert_eq!(releases.package_name, "serde");
+    assert_eq!(releases.target.version, "1.0.1");
+    assert_eq!(releases.previous.version, "1.0.0");
 
     let resolver = registry.get("npm-registry").expect("npm registry resolver");
     assert_eq!(resolver.id(), "npm-registry");
@@ -190,6 +235,10 @@ fn built_in_release_resolver_registry_contains_configured_ecosystem_resolvers() 
     assert!(request.starts_with("GET /left-pad HTTP/1.1\r\n"));
     let request = pypi_server.join().expect("pypi server thread completes");
     assert!(request.starts_with("GET /pypi/requests/json HTTP/1.1\r\n"));
+    let request = crates_io_server
+        .join()
+        .expect("crates.io server thread completes");
+    assert!(request.starts_with("GET /api/v1/crates/serde HTTP/1.1\r\n"));
 }
 
 #[test]
@@ -200,7 +249,11 @@ fn built_in_release_decision_evaluator_registry_contains_release_policies() {
 
     assert_eq!(
         registry.available_ids(),
-        vec!["npm-release-policy", "python-release-policy"]
+        vec![
+            "npm-release-policy",
+            "python-release-policy",
+            "rust-release-policy"
+        ]
     );
 
     let evaluator = registry
@@ -212,6 +265,11 @@ fn built_in_release_decision_evaluator_registry_contains_release_policies() {
         .get("python-release-policy")
         .expect("python release decision evaluator");
     assert_eq!(evaluator.id(), "python-release-policy");
+
+    let evaluator = registry
+        .get("rust-release-policy")
+        .expect("rust release decision evaluator");
+    assert_eq!(evaluator.id(), "rust-release-policy");
 }
 
 #[derive(Debug, Clone, Copy)]

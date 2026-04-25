@@ -611,6 +611,7 @@ Options:
   -V, --version    Print version
 
 Examples:
+  lfg cargo add <crate>
   lfg npm install <package>
   lfg pnpm add <package>
   lfg yarn add <package>

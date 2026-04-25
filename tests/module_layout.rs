@@ -4,6 +4,10 @@ use lfg::core::{
     PackageManager, PackageOutcome, Registry, ReleaseDecisionEvaluator, ReleaseReviewer,
     SkipReason, UnavailableReleaseReviewer, Verdict,
 };
+use lfg::ecosystems::crates_io::{
+    CratesIoCrateClient, CratesIoHttpCrateClient, CratesIoRegistryResolver,
+    RustReleaseDecisionEvaluator,
+};
 use lfg::ecosystems::npm::{
     evaluate_npm_install_request, NpmPackumentClient, NpmRegistryResolver,
     NpmReleaseDecisionEvaluator,
@@ -15,6 +19,7 @@ use lfg::evidence::{
     read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
     UnifiedDiffEngine,
 };
+use lfg::managers::cargo::CargoManagerAdapter;
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::pnpm::PnpmManagerAdapter;
@@ -64,6 +69,10 @@ fn public_modules_are_grouped_by_role() {
     let _ = read_tgz_source_tree;
     let _ = HttpArchiveFetcher;
     let _ = <HttpArchiveFetcher as ArchiveFetcher>::fetch;
+    let _ = CargoManagerAdapter;
+    let _ = CratesIoRegistryResolver::new(NeverCrateClient, "https://crates.io");
+    let _ = CratesIoHttpCrateClient::new("https://crates.io");
+    let _ = RustReleaseDecisionEvaluator::new;
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
     let _ = PnpmManagerAdapter;
@@ -95,6 +104,17 @@ fn public_modules_are_grouped_by_role() {
 }
 
 struct NeverPackumentClient;
+
+struct NeverCrateClient;
+
+impl CratesIoCrateClient for NeverCrateClient {
+    fn fetch_crate(
+        &self,
+        _crate_name: &str,
+    ) -> Result<String, lfg::ecosystems::crates_io::CratesIoFetchError> {
+        unreachable!("module layout test does not fetch crates")
+    }
+}
 
 impl NpmPackumentClient for NeverPackumentClient {
     fn fetch_packument(

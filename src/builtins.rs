@@ -5,12 +5,16 @@ use std::time::Duration;
 use crate::core::{EcosystemReleaseResolver, ManagerIntegrationAdapter};
 use crate::core::{Registry, RegistryError};
 use crate::core::{ReleaseDecisionEvaluator, ReviewPolicy};
+use crate::ecosystems::crates_io::{
+    CratesIoHttpCrateClient, CratesIoRegistryResolver, RustReleaseDecisionEvaluator,
+};
 use crate::ecosystems::npm::{
     NpmHttpPackumentClient, NpmRegistryResolver, NpmReleaseDecisionEvaluator,
 };
 use crate::ecosystems::pypi::{
     PypiHttpProjectClient, PypiRegistryResolver, PythonReleaseDecisionEvaluator,
 };
+use crate::managers::cargo::CargoManagerAdapter;
 use crate::managers::npm::NpmManagerAdapter;
 use crate::managers::pip::PipManagerAdapter;
 use crate::managers::pnpm::PnpmManagerAdapter;
@@ -24,6 +28,7 @@ pub type ReleaseDecisionEvaluatorRegistry<'a> = Registry<Box<dyn ReleaseDecision
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdapterConfig {
+    pub crates_io_registry_base_url: String,
     pub npm_registry_base_url: String,
     pub pypi_registry_base_url: String,
 }
@@ -31,6 +36,8 @@ pub struct AdapterConfig {
 impl AdapterConfig {
     pub fn from_env() -> Self {
         Self {
+            crates_io_registry_base_url: env::var("LFG_CRATES_IO_REGISTRY_URL")
+                .unwrap_or_else(|_| "https://crates.io".to_owned()),
             npm_registry_base_url: env::var("LFG_NPM_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://registry.npmjs.org".to_owned()),
             pypi_registry_base_url: env::var("LFG_PYPI_REGISTRY_URL")
@@ -135,6 +142,11 @@ impl ProgramDetector for PathProgramDetector {
 
 pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryError> {
     let mut registry = Registry::new();
+    let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(CargoManagerAdapter);
+    let id = adapter.id();
+
+    registry.register(id, adapter)?;
+
     let adapter: Box<dyn ManagerIntegrationAdapter> = Box::new(NpmManagerAdapter);
     let id = adapter.id();
 
@@ -175,6 +187,12 @@ pub fn built_in_release_decision_evaluators<'a>(
 
     let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
         Box::new(PythonReleaseDecisionEvaluator::new(policy));
+    let id = evaluator.id();
+
+    registry.register(id, evaluator)?;
+
+    let evaluator: Box<dyn ReleaseDecisionEvaluator + 'a> =
+        Box::new(RustReleaseDecisionEvaluator::new(policy));
     let id = evaluator.id();
 
     registry.register(id, evaluator)?;
@@ -255,6 +273,14 @@ pub fn built_in_release_resolvers(
     config: AdapterConfig,
 ) -> Result<ReleaseResolverRegistry, RegistryError> {
     let mut registry = Registry::new();
+    let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(CratesIoRegistryResolver::new(
+        CratesIoHttpCrateClient::new(config.crates_io_registry_base_url.clone()),
+        config.crates_io_registry_base_url,
+    ));
+    let id = resolver.id();
+
+    registry.register(id, resolver)?;
+
     let resolver: Box<dyn EcosystemReleaseResolver> = Box::new(NpmRegistryResolver::new(
         NpmHttpPackumentClient::new(config.npm_registry_base_url),
     ));

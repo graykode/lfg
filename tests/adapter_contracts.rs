@@ -3,8 +3,12 @@ use lfg::core::{
     ResolveError, ResolvedPackageRelease, ResolvedPackageReleases,
 };
 use lfg::core::{InstallOperation, InstallTarget, PackageManager};
+use lfg::ecosystems::crates_io::{
+    CratesIoCrateClient, CratesIoFetchError, CratesIoRegistryResolver,
+};
 use lfg::ecosystems::npm::{NpmFetchError, NpmPackumentClient, NpmRegistryResolver};
 use lfg::ecosystems::pypi::{PypiFetchError, PypiProjectClient, PypiRegistryResolver};
+use lfg::managers::cargo::CargoManagerAdapter;
 use lfg::managers::npm::NpmManagerAdapter;
 use lfg::managers::pip::PipManagerAdapter;
 use lfg::managers::pnpm::PnpmManagerAdapter;
@@ -12,6 +16,33 @@ use lfg::managers::uv::UvManagerAdapter;
 use lfg::managers::yarn::YarnManagerAdapter;
 
 struct StaticPackumentClient;
+
+struct StaticCrateClient;
+
+impl CratesIoCrateClient for StaticCrateClient {
+    fn fetch_crate(&self, crate_name: &str) -> Result<String, CratesIoFetchError> {
+        if crate_name != "serde" {
+            return Err(CratesIoFetchError::Unavailable(crate_name.to_owned()));
+        }
+
+        Ok(r#"{
+          "crate": { "id": "serde", "max_version": "1.0.1" },
+          "versions": [
+            {
+              "num": "1.0.1",
+              "created_at": "1970-01-02T00:00:00+00:00",
+              "dl_path": "/api/v1/crates/serde/1.0.1/download"
+            },
+            {
+              "num": "1.0.0",
+              "created_at": "1970-01-01T00:00:00+00:00",
+              "dl_path": "/api/v1/crates/serde/1.0.0/download"
+            }
+          ]
+        }"#
+        .to_owned())
+    }
+}
 
 impl NpmPackumentClient for StaticPackumentClient {
     fn fetch_packument(&self, package_name: &str) -> Result<String, NpmFetchError> {
@@ -68,6 +99,30 @@ impl PypiProjectClient for StaticProjectClient {
         }"#
         .to_owned())
     }
+}
+
+#[test]
+fn cargo_manager_adapter_implements_common_contract() {
+    let adapter = CargoManagerAdapter;
+
+    let request = adapter
+        .parse_install(&["add".to_owned(), "serde".to_owned()])
+        .expect("cargo add should parse");
+
+    assert_eq!(adapter.id(), "cargo");
+    assert_eq!(adapter.release_resolver_id(), "crates-io-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "rust-release-policy"
+    );
+    assert_eq!(request.manager, PackageManager::Cargo);
+    assert_eq!(request.operation, InstallOperation::Add);
+    assert_eq!(
+        request.targets,
+        vec![InstallTarget {
+            spec: "serde".to_owned()
+        }]
+    );
 }
 
 #[test]
@@ -197,6 +252,47 @@ fn yarn_manager_adapter_implements_common_contract() {
         vec![InstallTarget {
             spec: "left-pad".to_owned()
         }]
+    );
+}
+
+#[test]
+fn crates_io_registry_resolver_implements_common_contract() {
+    let resolver = CratesIoRegistryResolver::new(StaticCrateClient, "https://crates.io");
+
+    assert_eq!(resolver.id(), "crates-io-registry");
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "serde".to_owned()
+        }),
+        Ok(ResolvedPackageReleases {
+            package_name: "serde".to_owned(),
+            target: ResolvedPackageRelease {
+                version: "1.0.1".to_owned(),
+                published_at: "1970-01-02T00:00:00+00:00".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://crates.io/api/v1/crates/serde/1.0.1/download".to_owned()
+                },
+            },
+            previous: ResolvedPackageRelease {
+                version: "1.0.0".to_owned(),
+                published_at: "1970-01-01T00:00:00+00:00".to_owned(),
+                archive: ArchiveRef {
+                    url: "https://crates.io/api/v1/crates/serde/1.0.0/download".to_owned()
+                },
+            },
+        })
+    );
+}
+
+#[test]
+fn crates_io_registry_resolver_maps_fetch_failures_to_common_resolve_error() {
+    let resolver = CratesIoRegistryResolver::new(StaticCrateClient, "https://crates.io");
+
+    assert_eq!(
+        resolver.resolve(&InstallTarget {
+            spec: "missing".to_owned()
+        }),
+        Err(ResolveError::RegistryUnavailable("missing".to_owned()))
     );
 }
 
