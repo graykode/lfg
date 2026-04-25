@@ -20,6 +20,19 @@ pub trait ReleaseDecisionEvaluator {
     ) -> Result<ReviewDecision, ReleaseDecisionError>;
 }
 
+pub trait ReleaseReviewer {
+    fn review(&self, releases: &ResolvedPackageReleases) -> PackageOutcome;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnavailableReleaseReviewer;
+
+impl ReleaseReviewer for UnavailableReleaseReviewer {
+    fn review(&self, _releases: &ResolvedPackageReleases) -> PackageOutcome {
+        PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::DiffFailure)
+    }
+}
+
 pub fn evaluate_install_request<R, E>(
     request: &InstallRequest,
     resolver: &R,
@@ -29,6 +42,27 @@ pub fn evaluate_install_request<R, E>(
 where
     R: EcosystemReleaseResolver + ?Sized,
     E: ReleaseDecisionEvaluator + ?Sized,
+{
+    evaluate_install_request_with_reviewer(
+        request,
+        resolver,
+        decision_evaluator,
+        &UnavailableReleaseReviewer,
+        now,
+    )
+}
+
+pub fn evaluate_install_request_with_reviewer<R, E, V>(
+    request: &InstallRequest,
+    resolver: &R,
+    decision_evaluator: &E,
+    reviewer: &V,
+    now: SystemTime,
+) -> Vec<PackageOutcome>
+where
+    R: EcosystemReleaseResolver + ?Sized,
+    E: ReleaseDecisionEvaluator + ?Sized,
+    V: ReleaseReviewer + ?Sized,
 {
     request
         .targets
@@ -43,15 +77,22 @@ where
                 Err(error) => return outcome_from_policy_error(error),
             };
 
-            outcome_from_policy_decision(decision)
+            outcome_from_policy_decision(decision, &releases, reviewer)
         })
         .collect()
 }
 
-fn outcome_from_policy_decision(decision: ReviewDecision) -> PackageOutcome {
+fn outcome_from_policy_decision<V>(
+    decision: ReviewDecision,
+    releases: &ResolvedPackageReleases,
+    reviewer: &V,
+) -> PackageOutcome
+where
+    V: ReleaseReviewer + ?Sized,
+{
     match PackageOutcome::from_policy_decision(decision) {
         Some(outcome) => outcome,
-        None => PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::DiffFailure),
+        None => reviewer.review(releases),
     }
 }
 

@@ -1,7 +1,8 @@
 use lfg::core::{
-    aggregate_verdicts, evaluate_install_request, ArchiveRef, InstallOperation, InstallRequest,
-    InstallTarget, ManagerIntegrationAdapter, PackageManager, PackageOutcome, Registry,
-    ReleaseDecisionEvaluator, SkipReason, Verdict,
+    aggregate_verdicts, evaluate_install_request, evaluate_install_request_with_reviewer,
+    ArchiveRef, InstallOperation, InstallRequest, InstallTarget, ManagerIntegrationAdapter,
+    PackageManager, PackageOutcome, Registry, ReleaseDecisionEvaluator, ReleaseReviewer,
+    SkipReason, UnavailableReleaseReviewer, Verdict,
 };
 use lfg::evidence::{
     read_tgz_source_tree, ArchiveFetcher, DiffEngine, HttpArchiveFetcher, SourceTree,
@@ -11,7 +12,7 @@ use lfg::managers::npm::{
     evaluate_npm_install_request, NpmManagerAdapter, NpmPackumentClient, NpmRegistryResolver,
     NpmReleaseDecisionEvaluator,
 };
-use lfg::providers::parse_provider_output;
+use lfg::providers::{parse_provider_output, ArchiveDiffReviewer};
 
 #[test]
 fn public_modules_are_grouped_by_role() {
@@ -54,9 +55,16 @@ fn public_modules_are_grouped_by_role() {
     let _ = <HttpArchiveFetcher as ArchiveFetcher>::fetch;
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
+    let _ = ArchiveDiffReviewer::<HttpArchiveFetcher, UnifiedDiffEngine>::new;
     let _ = evaluate_npm_install_request::<NpmRegistryResolver<NeverPackumentClient>>;
     let _ = evaluate_install_request::<NeverResolver, NeverDecisionEvaluator>;
+    let _ = evaluate_install_request_with_reviewer::<
+        NeverResolver,
+        NeverDecisionEvaluator,
+        UnavailableReleaseReviewer,
+    >;
     let _ = <NeverDecisionEvaluator as ReleaseDecisionEvaluator>::decide;
+    let _ = <UnavailableReleaseReviewer as ReleaseReviewer>::review;
     let _ = request;
 }
 

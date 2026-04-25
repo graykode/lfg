@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use lfg::core::{evaluate_install_request, ReleaseDecisionError, ReleaseDecisionEvaluator};
+use lfg::core::{
+    evaluate_install_request, evaluate_install_request_with_reviewer, ReleaseDecisionError,
+    ReleaseDecisionEvaluator, ReleaseReviewer,
+};
 use lfg::core::{
     ArchiveRef, EcosystemReleaseResolver, ResolveError, ResolvedPackageRelease,
     ResolvedPackageReleases,
@@ -50,6 +53,20 @@ impl ReleaseDecisionEvaluator for StaticDecisionEvaluator {
     }
 }
 
+#[derive(Debug, Clone)]
+struct StaticReviewer {
+    results: BTreeMap<String, PackageOutcome>,
+}
+
+impl ReleaseReviewer for StaticReviewer {
+    fn review(&self, releases: &ResolvedPackageReleases) -> PackageOutcome {
+        *self
+            .results
+            .get(&releases.package_name)
+            .expect("test package should be configured")
+    }
+}
+
 fn install_request(specs: &[&str]) -> InstallRequest {
     InstallRequest {
         manager: PackageManager::Npm,
@@ -82,6 +99,35 @@ fn releases(package_name: &str) -> ResolvedPackageReleases {
             },
         },
     }
+}
+
+#[test]
+fn review_decisions_are_delegated_to_release_reviewer() {
+    let resolver = StaticResolver {
+        results: BTreeMap::from([("recent-package".to_owned(), Ok(releases("recent-package")))]),
+    };
+    let evaluator = StaticDecisionEvaluator {
+        results: BTreeMap::from([("recent-package".to_owned(), Ok(ReviewDecision::Review))]),
+    };
+    let reviewer = StaticReviewer {
+        results: BTreeMap::from([(
+            "recent-package".to_owned(),
+            PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::ProviderFailure),
+        )]),
+    };
+
+    assert_eq!(
+        evaluate_install_request_with_reviewer(
+            &install_request(&["recent-package"]),
+            &resolver,
+            &evaluator,
+            &reviewer,
+            SystemTime::UNIX_EPOCH,
+        ),
+        vec![PackageOutcome::ReviewUnavailable(
+            ReviewUnavailableReason::ProviderFailure
+        )]
+    );
 }
 
 #[test]

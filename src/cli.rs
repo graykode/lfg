@@ -6,11 +6,13 @@ use crate::builtins::{
     AdapterConfig,
 };
 use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
-use crate::core::{evaluate_install_request, AskReason};
+use crate::core::{evaluate_install_request_with_reviewer, AskReason};
 use crate::core::{
     InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter,
 };
 use crate::core::{ReviewPolicy, Verdict};
+use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
+use crate::providers::ArchiveDiffReviewer;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliResponse {
@@ -82,10 +84,12 @@ fn evaluate_manager_request(
         Err(_) => return evaluator_unavailable_response(adapter.id()),
     };
 
-    let outcomes = evaluate_install_request(
+    let reviewer = ArchiveDiffReviewer::new(HttpArchiveFetcher, UnifiedDiffEngine);
+    let outcomes = evaluate_install_request_with_reviewer(
         &request,
         resolver.as_ref(),
         evaluator.as_ref(),
+        &reviewer,
         current_time(),
     );
     let verdict = aggregate_verdicts(&outcomes);
@@ -209,6 +213,17 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
         )
     }) {
         return format!("lfg: {manager_id} registry metadata is unavailable; install is paused.\n");
+    }
+
+    if outcomes.iter().any(|outcome| {
+        matches!(
+            outcome,
+            PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::ProviderFailure)
+        )
+    }) {
+        return format!(
+            "lfg: review required for {manager_id} {operation}, but provider review is not wired yet. install is paused.\n"
+        );
     }
 
     if outcomes.iter().any(|outcome| {
