@@ -15,11 +15,11 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Work on **Milestone 5: More Managers**.
+Work on **post-milestone review and hardening**.
 
-Add new package managers through focused manager adapters and shared
-ecosystem resolvers. Prefer the npm ecosystem path first for `pnpm` and
-`yarn` before adding new registry ecosystems.
+Milestones 1-5 have implementation coverage. Before adding new feature
+scope, review manager/ecosystem boundaries, fail-to-ask behavior, and
+archive support gaps such as Ruby `.gem` source extraction.
 
 ## Non-Negotiables
 
