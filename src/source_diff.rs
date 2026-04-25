@@ -1,11 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SourceTree {
     files: BTreeMap<String, String>,
 }
 
 impl SourceTree {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn from_text_files<I, P, C>(files: I) -> Self
     where
         I: IntoIterator<Item = (P, C)>,
@@ -18,6 +22,10 @@ impl SourceTree {
                 .map(|(path, content)| (path.into(), content.into()))
                 .collect(),
         }
+    }
+
+    pub fn insert_text_file(&mut self, path: impl Into<String>, content: impl Into<String>) {
+        self.files.insert(path.into(), content.into());
     }
 }
 
