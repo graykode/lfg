@@ -87,6 +87,8 @@ Responsibilities:
 - avoid recursion when finding the real manager binary
 - preserve stdin, stdout, stderr, environment, and exit behavior where safe
 - run the real package manager only after the install gate allows it
+- honor `LFG_BYPASS=1` as an emergency path that skips review and runs the
+  real package manager directly
 
 Shell aliases or functions are acceptable as convenience setup because they
 are simple, reversible, and familiar. They are not a complete security

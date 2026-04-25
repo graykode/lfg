@@ -11,7 +11,7 @@ use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
 use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor};
 use crate::core::{
-    InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter,
+    InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter, RealCommand,
 };
 use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
 use crate::providers::ArchiveDiffReviewer;
@@ -75,10 +75,21 @@ fn run_manager(
         Err(_) => return unknown_argument_response(manager_id),
     };
 
+    if bypass_requested() {
+        return execute_manager_args(adapter.id(), args, invocation_program_path);
+    }
+
     match adapter.parse_install(&args) {
         Ok(request) => evaluate_manager_request(adapter.as_ref(), request, invocation_program_path),
         Err(error) => manager_parse_error_response(manager_id, error),
     }
+}
+
+fn bypass_requested() -> bool {
+    matches!(
+        env::var("LFG_BYPASS").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    )
 }
 
 fn evaluate_manager_request(
@@ -140,6 +151,30 @@ fn execute_manager_request(
 ) -> CliResponse {
     let command = adapter.real_command(request);
 
+    execute_real_command(adapter.id(), command, executor)
+}
+
+fn execute_manager_args(
+    manager_id: &str,
+    args: Vec<String>,
+    invocation_program_path: PathBuf,
+) -> CliResponse {
+    let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
+    execute_real_command(
+        manager_id,
+        RealCommand {
+            program: manager_id.to_owned(),
+            args,
+        },
+        &executor,
+    )
+}
+
+fn execute_real_command(
+    manager_id: &str,
+    command: RealCommand,
+    executor: &dyn CommandExecutor,
+) -> CliResponse {
     match executor.execute(&command) {
         Ok(output) => CliResponse {
             exit_code: output.exit_code,
@@ -151,7 +186,7 @@ fn execute_manager_request(
             stdout: String::new(),
             stderr: format!(
                 "lfg: {} executable is unavailable; install is paused.\n",
-                adapter.id()
+                manager_id
             ),
         },
         Err(CommandExecutionError::Failed(_)) => CliResponse {
@@ -159,7 +194,7 @@ fn execute_manager_request(
             stdout: String::new(),
             stderr: format!(
                 "lfg: {} execution could not start; install is paused.\n",
-                adapter.id()
+                manager_id
             ),
         },
     }
