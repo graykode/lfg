@@ -1,3 +1,4 @@
+pub mod builtins;
 pub mod cargo;
 pub mod gem;
 pub mod npm;

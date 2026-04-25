@@ -17,13 +17,7 @@ use crate::ecosystems::pypi::{
 use crate::ecosystems::rubygems::{
     RubyGemsHttpVersionsClient, RubyGemsRegistryResolver, RubyReleaseDecisionEvaluator,
 };
-use crate::managers::cargo::CargoManagerAdapter;
-use crate::managers::gem::GemManagerAdapter;
-use crate::managers::npm::NpmManagerAdapter;
-use crate::managers::pip::PipManagerAdapter;
-use crate::managers::pnpm::PnpmManagerAdapter;
-use crate::managers::uv::UvManagerAdapter;
-use crate::managers::yarn::YarnManagerAdapter;
+use crate::managers::builtins::built_in_manager_adapter_catalog;
 use crate::providers::{CommandReviewProvider, ReviewProvider, UnavailableReviewProvider};
 
 pub type ManagerAdapterRegistry = Registry<Box<dyn ManagerIntegrationAdapter>>;
@@ -149,23 +143,11 @@ impl ProgramDetector for PathProgramDetector {
 
 pub fn built_in_manager_adapters() -> Result<ManagerAdapterRegistry, RegistryError> {
     let mut registry = Registry::new();
-    for adapter in built_in_manager_adapter_list() {
+    for adapter in built_in_manager_adapter_catalog() {
         register_manager_adapter(&mut registry, adapter)?;
     }
 
     Ok(registry)
-}
-
-fn built_in_manager_adapter_list() -> [Box<dyn ManagerIntegrationAdapter>; 7] {
-    [
-        Box::new(CargoManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(GemManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(NpmManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(PipManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(PnpmManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(UvManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-        Box::new(YarnManagerAdapter) as Box<dyn ManagerIntegrationAdapter>,
-    ]
 }
 
 fn register_manager_adapter(

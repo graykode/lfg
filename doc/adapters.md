@@ -139,7 +139,7 @@ wire it into the built-in registry:
 - if the manager uses an existing ecosystem, point the adapter at that
   resolver and policy; otherwise add a focused resolver under
   `src/ecosystems/<ecosystem>/`
-- add the adapter to `built_in_manager_adapter_list()` in `src/builtins.rs`
+- add the adapter to the catalog in `src/managers/builtins.rs`
 - add tests under `tests/managers/`, `tests/ecosystems/` when needed, and
   `tests/contracts/adapter.rs`
 
