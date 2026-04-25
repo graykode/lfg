@@ -1,0 +1,53 @@
+use lfg::install_request::{InstallOperation, InstallRequest, InstallTarget, PackageManager};
+use lfg::npm::{parse_npm_install, NpmParseError};
+
+fn args(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_owned()).collect()
+}
+
+#[test]
+fn parses_npm_install_package() {
+    assert_eq!(
+        parse_npm_install(&args(&["install", "left-pad"])),
+        Ok(InstallRequest {
+            manager: PackageManager::Npm,
+            operation: InstallOperation::Install,
+            targets: vec![InstallTarget {
+                spec: "left-pad".to_owned()
+            }],
+            manager_args: args(&["install", "left-pad"]),
+        })
+    );
+}
+
+#[test]
+fn parses_npm_i_alias() {
+    let request =
+        parse_npm_install(&args(&["i", "@scope/pkg@1.2.3"])).expect("npm i alias should parse");
+
+    assert_eq!(request.manager, PackageManager::Npm);
+    assert_eq!(request.operation, InstallOperation::Install);
+    assert_eq!(
+        request.targets,
+        vec![InstallTarget {
+            spec: "@scope/pkg@1.2.3".to_owned()
+        }]
+    );
+    assert_eq!(request.manager_args, args(&["i", "@scope/pkg@1.2.3"]));
+}
+
+#[test]
+fn rejects_npm_install_without_package() {
+    assert_eq!(
+        parse_npm_install(&args(&["install"])),
+        Err(NpmParseError::MissingPackage)
+    );
+}
+
+#[test]
+fn rejects_unsupported_npm_command() {
+    assert_eq!(
+        parse_npm_install(&args(&["run", "build"])),
+        Err(NpmParseError::UnsupportedCommand("run".to_owned()))
+    );
+}

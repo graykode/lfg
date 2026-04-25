@@ -1,3 +1,4 @@
+use crate::npm::{parse_npm_install, NpmParseError};
 use crate::verdict::Verdict;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,22 +12,23 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
     let mut args = args.into_iter();
     let _program = args.next();
 
-    match args.next().as_deref() {
+    match args.next() {
         None => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: String::new(),
         },
-        Some("--help") | Some("-h") => CliResponse {
+        Some(argument) if argument == "--help" || argument == "-h" => CliResponse {
             exit_code: 0,
             stdout: help_text(),
             stderr: String::new(),
         },
-        Some("--version") | Some("-V") => CliResponse {
+        Some(argument) if argument == "--version" || argument == "-V" => CliResponse {
             exit_code: 0,
             stdout: format!("lfg {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
+        Some(argument) if argument == "npm" => run_npm(args.collect()),
         Some(argument) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
@@ -35,15 +37,43 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
     }
 }
 
+fn run_npm(args: Vec<String>) -> CliResponse {
+    match parse_npm_install(&args) {
+        Ok(_) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: "lfg: npm install review is not wired yet, so install is paused.\n".to_owned(),
+        },
+        Err(NpmParseError::MissingCommand) => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: "lfg: npm command is required\n".to_owned(),
+        },
+        Err(NpmParseError::MissingPackage) => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: "lfg: npm install needs at least one package\n".to_owned(),
+        },
+        Err(NpmParseError::UnsupportedCommand(command)) => CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: format!("lfg: unsupported npm command: {command}\n"),
+        },
+    }
+}
+
 fn help_text() -> String {
     "\
 lfg is a local pre-install guard for package managers.
 
-Usage: lfg [OPTIONS]
+Usage: lfg [OPTIONS] [MANAGER] [ARGS]
 
 Options:
   -h, --help       Print help
   -V, --version    Print version
+
+Examples:
+  lfg npm install <package>
 "
     .to_owned()
 }

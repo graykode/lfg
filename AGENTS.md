@@ -15,10 +15,10 @@ Keep it short. Put durable product detail in `doc/`.
 
 ## Current Target
 
-Start with **Milestone 0: Core contract**.
+Work on **Milestone 1: Explicit Wrapper Vertical Slice**.
 
-Do not begin package-manager integration until verdict exit codes, review
-policy decisions, adapter registry behavior, and fail-to-ask behavior are
+Keep package-manager integration behind the explicit wrapper path until
+the npm resolver, archive diff, provider adapter, and gated execution are
 covered by tests.
 
 ## Non-Negotiables

@@ -44,3 +44,16 @@ fn unknown_argument_is_cli_misuse() {
     let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
     assert!(stderr.contains("unknown argument: --definitely-unknown"));
 }
+
+#[test]
+fn explicit_npm_install_pauses_until_review_is_available() {
+    let output = run_lfg(&["npm", "install", "left-pad"]);
+
+    assert_eq!(output.status.code(), Some(20));
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert_eq!(
+        stderr,
+        "lfg: npm install review is not wired yet, so install is paused.\n"
+    );
+}
