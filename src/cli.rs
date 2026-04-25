@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -26,13 +27,80 @@ pub struct CliResponse {
     pub stderr: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AskConfirmation {
+    Accepted,
+    Declined,
+    Unavailable,
+}
+
+pub trait AskConfirmer {
+    fn confirm(&mut self, prompt: &str) -> AskConfirmation;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NonInteractiveAskConfirmer;
+
+impl AskConfirmer for NonInteractiveAskConfirmer {
+    fn confirm(&mut self, _prompt: &str) -> AskConfirmation {
+        AskConfirmation::Unavailable
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StdioAskConfirmer;
+
+impl AskConfirmer for StdioAskConfirmer {
+    fn confirm(&mut self, prompt: &str) -> AskConfirmation {
+        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
+            return AskConfirmation::Unavailable;
+        }
+
+        let mut stderr = io::stderr();
+        if write!(stderr, "{prompt}")
+            .and_then(|_| stderr.flush())
+            .is_err()
+        {
+            return AskConfirmation::Unavailable;
+        }
+
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() {
+            return AskConfirmation::Unavailable;
+        }
+
+        match input.trim().to_ascii_lowercase().as_str() {
+            "y" | "yes" => AskConfirmation::Accepted,
+            _ => AskConfirmation::Declined,
+        }
+    }
+}
+
 pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
+    let mut confirmer = NonInteractiveAskConfirmer;
+    run_with_ask_confirmer(args, &mut confirmer)
+}
+
+pub fn run_interactive(args: impl IntoIterator<Item = String>) -> CliResponse {
+    let mut confirmer = StdioAskConfirmer;
+    run_with_ask_confirmer(args, &mut confirmer)
+}
+
+fn run_with_ask_confirmer(
+    args: impl IntoIterator<Item = String>,
+    confirmer: &mut dyn AskConfirmer,
+) -> CliResponse {
     let mut args = args.into_iter();
     let program = args.next().unwrap_or_default();
     let invocation_program_path = PathBuf::from(&program);
 
     if let Some(manager_id) = manager_id_from_program(&program) {
-        return run_manager(manager_id, args.collect(), invocation_program_path);
+        return run_manager(
+            manager_id,
+            args.collect(),
+            invocation_program_path,
+            confirmer,
+        );
     }
 
     match args.next() {
@@ -52,7 +120,12 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
             stderr: String::new(),
         },
         Some(argument) if argument == "shim" => run_shim_command(args.collect()),
-        Some(argument) => run_manager(&argument, args.collect(), invocation_program_path),
+        Some(argument) => run_manager(
+            &argument,
+            args.collect(),
+            invocation_program_path,
+            confirmer,
+        ),
     }
 }
 
@@ -69,6 +142,7 @@ fn run_manager(
     manager_id: &str,
     args: Vec<String>,
     invocation_program_path: PathBuf,
+    confirmer: &mut dyn AskConfirmer,
 ) -> CliResponse {
     let registry = match built_in_manager_adapters() {
         Ok(registry) => registry,
@@ -84,7 +158,12 @@ fn run_manager(
     }
 
     match adapter.parse_install(&args) {
-        Ok(request) => evaluate_manager_request(adapter.as_ref(), request, invocation_program_path),
+        Ok(request) => evaluate_manager_request(
+            adapter.as_ref(),
+            request,
+            invocation_program_path,
+            confirmer,
+        ),
         Err(error) => manager_parse_error_response(manager_id, error),
     }
 }
@@ -192,6 +271,7 @@ fn evaluate_manager_request(
     adapter: &dyn ManagerIntegrationAdapter,
     request: InstallRequest,
     invocation_program_path: PathBuf,
+    confirmer: &mut dyn AskConfirmer,
 ) -> CliResponse {
     let resolver_registry = match built_in_release_resolvers(AdapterConfig::from_env()) {
         Ok(registry) => registry,
@@ -231,12 +311,48 @@ fn evaluate_manager_request(
         return execute_manager_request(adapter, &request, &executor);
     }
 
+    if verdict == Verdict::Ask {
+        let operation = operation_label(request.operation);
+        let ask_message = ask_message(adapter.id(), operation, &outcomes);
+        let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
+        return confirm_ask_or_pause(adapter.id(), operation, ask_message, confirmer, || {
+            execute_manager_request(adapter, &request, &executor)
+        });
+    }
+
     let (exit_code, stderr) = cli_result(adapter.id(), request.operation, &outcomes, verdict);
 
     CliResponse {
         exit_code,
         stdout: String::new(),
         stderr,
+    }
+}
+
+fn confirm_ask_or_pause<F>(
+    manager_id: &str,
+    operation: &str,
+    ask_message: String,
+    confirmer: &mut dyn AskConfirmer,
+    execute: F,
+) -> CliResponse
+where
+    F: FnOnce() -> CliResponse,
+{
+    let prompt = format!("{ask_message}lfg: continue with {manager_id} {operation} anyway? [y/N] ");
+
+    match confirmer.confirm(&prompt) {
+        AskConfirmation::Accepted => execute(),
+        AskConfirmation::Declined => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: "lfg: install cancelled by user.\n".to_owned(),
+        },
+        AskConfirmation::Unavailable => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: ask_message,
+        },
     }
 }
 
@@ -514,6 +630,99 @@ mod tests {
         assert_eq!(
             response.stderr,
             "lfg: npm install needs at least one package\n"
+        );
+    }
+
+    #[derive(Debug, Clone)]
+    struct StaticAskConfirmer {
+        decision: AskConfirmation,
+        prompts: Vec<String>,
+    }
+
+    impl AskConfirmer for StaticAskConfirmer {
+        fn confirm(&mut self, prompt: &str) -> AskConfirmation {
+            self.prompts.push(prompt.to_owned());
+            self.decision
+        }
+    }
+
+    #[test]
+    fn accepted_ask_confirmation_executes_manager() {
+        let mut confirmer = StaticAskConfirmer {
+            decision: AskConfirmation::Accepted,
+            prompts: Vec::new(),
+        };
+
+        let response = confirm_ask_or_pause(
+            "npm",
+            "install",
+            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            &mut confirmer,
+            || CliResponse {
+                exit_code: 0,
+                stdout: "ran npm\n".to_owned(),
+                stderr: String::new(),
+            },
+        );
+
+        assert_eq!(response.exit_code, 0);
+        assert_eq!(response.stdout, "ran npm\n");
+        assert_eq!(
+            confirmer.prompts,
+            vec![
+                "lfg: review could not complete safely; install is paused.\nlfg: continue with npm install anyway? [y/N] "
+            ]
+        );
+    }
+
+    #[test]
+    fn declined_ask_confirmation_stays_paused() {
+        let mut confirmer = StaticAskConfirmer {
+            decision: AskConfirmation::Declined,
+            prompts: Vec::new(),
+        };
+
+        let response = confirm_ask_or_pause(
+            "npm",
+            "install",
+            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            &mut confirmer,
+            || CliResponse {
+                exit_code: 0,
+                stdout: "ran npm\n".to_owned(),
+                stderr: String::new(),
+            },
+        );
+
+        assert_eq!(response.exit_code, 20);
+        assert!(response.stdout.is_empty());
+        assert_eq!(response.stderr, "lfg: install cancelled by user.\n");
+    }
+
+    #[test]
+    fn unavailable_ask_confirmation_keeps_non_interactive_ask_response() {
+        let mut confirmer = StaticAskConfirmer {
+            decision: AskConfirmation::Unavailable,
+            prompts: Vec::new(),
+        };
+
+        let response = confirm_ask_or_pause(
+            "npm",
+            "install",
+            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            &mut confirmer,
+            || CliResponse {
+                exit_code: 0,
+                stdout: "ran npm\n".to_owned(),
+                stderr: String::new(),
+            },
+        );
+
+        assert_eq!(response.exit_code, 20);
+        assert!(response.stdout.is_empty());
+        assert_eq!(
+            response.stderr,
+            "lfg: review could not complete safely; install is paused.\n"
         );
     }
 }

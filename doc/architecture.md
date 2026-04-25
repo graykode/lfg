@@ -180,6 +180,10 @@ The install gate aggregates package decisions.
 | any `ask` | ask the user in TTY mode, otherwise exit `ask` |
 | all `pass` or skipped-pass | execute the real package manager |
 
+When TTY confirmation is available, `ask` shows the review pause reason and
+requires an explicit `y` or `yes` before executing the real package
+manager. Empty input and any other answer keep the install paused.
+
 The gate is the only component that may execute the real package manager.
 
 ## Dependency Direction
