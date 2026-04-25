@@ -13,8 +13,8 @@ use lfg::managers::npm::{
     NpmReleaseDecisionEvaluator,
 };
 use lfg::providers::{
-    parse_provider_output, ArchiveDiffReviewer, DiffReviewPromptBuilder, ProviderError,
-    ReviewPrompt, ReviewProvider, UnavailableReviewProvider,
+    parse_provider_output, ArchiveDiffReviewer, CommandReviewProvider, DiffReviewPromptBuilder,
+    ProviderError, ReviewPrompt, ReviewProvider, UnavailableReviewProvider,
 };
 
 #[test]
@@ -59,6 +59,7 @@ fn public_modules_are_grouped_by_role() {
     let _ = NpmRegistryResolver::<NeverPackumentClient>::new;
     let _ = NpmReleaseDecisionEvaluator::new;
     let _ = ArchiveDiffReviewer::<HttpArchiveFetcher, UnifiedDiffEngine>::new;
+    let _ = CommandReviewProvider::new("demo", "true", Vec::<String>::new());
     let _ = DiffReviewPromptBuilder;
     let _ = UnavailableReviewProvider;
     let _ = ReviewPrompt {
