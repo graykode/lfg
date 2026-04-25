@@ -4,3 +4,4 @@ pub mod core;
 pub mod evidence;
 pub mod managers;
 pub mod providers;
+pub mod shims;

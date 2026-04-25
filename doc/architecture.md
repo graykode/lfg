@@ -94,6 +94,11 @@ Shell aliases or functions are acceptable as convenience setup because they
 are simple, reversible, and familiar. They are not a complete security
 boundary.
 
+PATH shim setup is explicit and reversible. `lfg shim install --dir <dir>
+npm` creates an `npm` shim in the chosen directory, and `lfg shim uninstall
+--dir <dir> npm` removes only shims that point back to the current lfg
+executable.
+
 Native trusted hooks or package-manager plugins can be added when an
 ecosystem offers a hook that runs before package code. They are secondary
 integrations. PATH shims remain the portable stronger baseline.

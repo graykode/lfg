@@ -15,6 +15,9 @@ use crate::core::{
 };
 use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
 use crate::providers::ArchiveDiffReviewer;
+use crate::shims::{
+    install_shim, parse_shim_command, uninstall_shim, ShimCommand, ShimCommandError, ShimSetupError,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliResponse {
@@ -48,6 +51,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
             stdout: format!("lfg {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
+        Some(argument) if argument == "shim" => run_shim_command(args.collect()),
         Some(argument) => run_manager(&argument, args.collect(), invocation_program_path),
     }
 }
@@ -90,6 +94,98 @@ fn bypass_requested() -> bool {
         env::var("LFG_BYPASS").ok().as_deref(),
         Some("1" | "true" | "yes")
     )
+}
+
+fn run_shim_command(args: Vec<String>) -> CliResponse {
+    let command = match parse_shim_command(&args) {
+        Ok(command) => command,
+        Err(error) => return shim_command_error_response(error),
+    };
+
+    let manager_id = match &command {
+        ShimCommand::Install { manager_id, .. } | ShimCommand::Uninstall { manager_id, .. } => {
+            manager_id
+        }
+    };
+    let registry = match built_in_manager_adapters() {
+        Ok(registry) => registry,
+        Err(_) => return adapter_unavailable_response(manager_id),
+    };
+    if registry.get(manager_id).is_err() {
+        return unknown_argument_response(manager_id);
+    }
+
+    let lfg_executable = match env::current_exe() {
+        Ok(path) => path,
+        Err(error) => {
+            return CliResponse {
+                exit_code: Verdict::Ask.exit_code(),
+                stdout: String::new(),
+                stderr: format!("lfg: could not locate lfg executable: {error}\n"),
+            };
+        }
+    };
+
+    match command {
+        ShimCommand::Install { manager_id, dir } => {
+            match install_shim(&manager_id, &dir, &lfg_executable) {
+                Ok(path) => CliResponse {
+                    exit_code: 0,
+                    stdout: format!("lfg: installed {manager_id} shim at {}\n", path.display()),
+                    stderr: String::new(),
+                },
+                Err(error) => shim_setup_error_response(error),
+            }
+        }
+        ShimCommand::Uninstall { manager_id, dir } => {
+            match uninstall_shim(&manager_id, &dir, &lfg_executable) {
+                Ok(path) => CliResponse {
+                    exit_code: 0,
+                    stdout: format!("lfg: removed {manager_id} shim from {}\n", path.display()),
+                    stderr: String::new(),
+                },
+                Err(error) => shim_setup_error_response(error),
+            }
+        }
+    }
+}
+
+fn shim_command_error_response(error: ShimCommandError) -> CliResponse {
+    let message = match error {
+        ShimCommandError::MissingAction => "lfg: shim action is required\n".to_owned(),
+        ShimCommandError::MissingDir => "lfg: shim --dir is required\n".to_owned(),
+        ShimCommandError::MissingManager => "lfg: shim manager is required\n".to_owned(),
+        ShimCommandError::UnsupportedAction(action) => {
+            format!("lfg: unsupported shim action: {action}\n")
+        }
+        ShimCommandError::UnknownArgument(argument) => {
+            format!("lfg: unknown shim argument: {argument}\n")
+        }
+    };
+
+    CliResponse {
+        exit_code: 1,
+        stdout: String::new(),
+        stderr: message,
+    }
+}
+
+fn shim_setup_error_response(error: ShimSetupError) -> CliResponse {
+    let message = match error {
+        ShimSetupError::ExistingPath(path) => {
+            format!("lfg: shim target already exists: {}\n", path.display())
+        }
+        ShimSetupError::NotLfgShim(path) => {
+            format!("lfg: not an lfg shim: {}\n", path.display())
+        }
+        ShimSetupError::Io(error) => format!("lfg: shim setup failed: {error}\n"),
+    };
+
+    CliResponse {
+        exit_code: 1,
+        stdout: String::new(),
+        stderr: message,
+    }
 }
 
 fn evaluate_manager_request(
@@ -364,6 +460,8 @@ fn help_text() -> String {
 lfg is a local pre-install guard for package managers.
 
 Usage: lfg [OPTIONS] [MANAGER] [ARGS]
+       lfg shim install --dir <DIR> <MANAGER>
+       lfg shim uninstall --dir <DIR> <MANAGER>
 
 Options:
   -h, --help       Print help
@@ -371,6 +469,7 @@ Options:
 
 Examples:
   lfg npm install <package>
+  lfg shim install --dir ~/.local/bin npm
 "
     .to_owned()
 }
