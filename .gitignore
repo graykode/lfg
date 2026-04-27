@@ -5,6 +5,7 @@
 docs/superpowers/
 demo.tape
 .idea/
+.vscode/
 
 # Env / secrets
 .env
