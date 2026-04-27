@@ -38,14 +38,22 @@ fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterEr
         return Err(ManagerAdapterError::UnsupportedCommand(command.to_owned()));
     }
 
-    let targets: Vec<InstallTarget> = args
-        .iter()
-        .skip(1)
-        .filter(|arg| !arg.starts_with('-'))
-        .map(|spec| InstallTarget {
-            spec: spec.to_owned(),
-        })
-        .collect();
+    let mut targets = Vec::new();
+    for arg in args.iter().skip(1) {
+        if arg.starts_with('-') {
+            if is_allowed_npm_install_option(arg) {
+                continue;
+            }
+
+            return Err(ManagerAdapterError::UnsupportedManagerOption(
+                arg.to_owned(),
+            ));
+        }
+
+        targets.push(InstallTarget {
+            spec: arg.to_owned(),
+        });
+    }
 
     if targets.is_empty() {
         return Err(ManagerAdapterError::MissingPackage);
@@ -57,4 +65,18 @@ fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterEr
         targets,
         manager_args: args.to_vec(),
     })
+}
+
+fn is_allowed_npm_install_option(arg: &str) -> bool {
+    matches!(
+        arg,
+        "-D" | "--save-dev"
+            | "-O"
+            | "--save-optional"
+            | "-P"
+            | "--save-prod"
+            | "--save-peer"
+            | "-E"
+            | "--save-exact"
+    )
 }

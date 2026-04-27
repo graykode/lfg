@@ -52,6 +52,21 @@ fn builds_real_npm_command_from_original_args() {
 }
 
 #[test]
+fn asks_on_resolution_affecting_npm_option() {
+    assert_eq!(
+        NpmManagerAdapter.parse_install(&args(&[
+            "install",
+            "--registry",
+            "https://example.invalid",
+            "left-pad"
+        ])),
+        Err(ManagerAdapterError::UnsupportedManagerOption(
+            "--registry".to_owned()
+        ))
+    );
+}
+
+#[test]
 fn rejects_npm_install_without_package() {
     assert_eq!(
         NpmManagerAdapter.parse_install(&args(&["install"])),
