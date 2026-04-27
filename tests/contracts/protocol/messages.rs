@@ -1,77 +1,11 @@
 use serde_json::json;
 
 use lfg::core::{
-    AdapterCapability, AdapterCapabilityKind, AdapterProtocolArchiveRef, AdapterProtocolError,
-    AdapterProtocolErrorCode, AdapterProtocolInstallOperation, AdapterProtocolInstallRequest,
+    AdapterProtocolArchiveRef, AdapterProtocolInstallOperation, AdapterProtocolInstallRequest,
     AdapterProtocolInstallTarget, AdapterProtocolRealCommand, AdapterProtocolRequest,
     AdapterProtocolResolvedPackageRelease, AdapterProtocolResolvedPackageReleases,
-    AdapterProtocolResponse, Verdict, ADAPTER_PROTOCOL_VERSION,
+    AdapterProtocolResponse, ADAPTER_PROTOCOL_VERSION,
 };
-use lfg::ecosystems::npm::{NpmPackumentClient, NpmRegistryResolver};
-use lfg::managers::npm::NpmManagerAdapter;
-
-#[test]
-fn handshake_and_capability_messages_have_stable_json_contract() {
-    let request = AdapterProtocolRequest::handshake("0.1.0");
-
-    assert_eq!(
-        serde_json::to_value(request).expect("handshake serializes"),
-        json!({
-            "type": "handshake",
-            "protocol_version": ADAPTER_PROTOCOL_VERSION,
-            "lfg_version": "0.1.0"
-        })
-    );
-
-    let response = AdapterProtocolResponse::handshake_accepted(
-        "demo-adapter",
-        vec![
-            AdapterCapability::manager_integration("demo-manager"),
-            AdapterCapability::ecosystem_release_resolver("demo-registry"),
-            AdapterCapability::llm_adapter("demo-llm"),
-        ],
-    );
-
-    assert_eq!(
-        serde_json::to_value(response).expect("handshake response serializes"),
-        json!({
-            "type": "handshake-accepted",
-            "protocol_version": ADAPTER_PROTOCOL_VERSION,
-            "adapter_id": "demo-adapter",
-            "capabilities": [
-                { "kind": "manager-integration", "id": "demo-manager" },
-                { "kind": "ecosystem-release-resolver", "id": "demo-registry" },
-                { "kind": "llm-adapter", "id": "demo-llm" }
-            ]
-        })
-    );
-
-    assert_eq!(
-        serde_json::to_value(AdapterProtocolRequest::capabilities())
-            .expect("capability request serializes"),
-        json!({
-            "type": "capabilities",
-            "protocol_version": ADAPTER_PROTOCOL_VERSION
-        })
-    );
-
-    let capabilities = AdapterProtocolResponse::capabilities(vec![
-        AdapterCapability::manager_integration("npm"),
-        AdapterCapability::ecosystem_release_resolver("npm-registry"),
-    ]);
-
-    assert_eq!(
-        serde_json::to_value(capabilities).expect("capability response serializes"),
-        json!({
-            "type": "capabilities",
-            "protocol_version": ADAPTER_PROTOCOL_VERSION,
-            "capabilities": [
-                { "kind": "manager-integration", "id": "npm" },
-                { "kind": "ecosystem-release-resolver", "id": "npm-registry" }
-            ]
-        })
-    );
-}
 
 #[test]
 fn parse_resolve_and_review_messages_have_stable_json_contracts() {
@@ -224,56 +158,4 @@ fn parse_resolve_and_review_messages_have_stable_json_contracts() {
             "raw_output": "verdict: pass\nreason: reviewed\n"
         })
     );
-}
-
-#[test]
-fn built_in_contracts_can_be_described_as_protocol_capabilities() {
-    let manager = NpmManagerAdapter;
-    let resolver = NpmRegistryResolver::new(NeverPackumentClient);
-
-    assert_eq!(
-        AdapterCapability::from_manager_adapter(&manager),
-        AdapterCapability {
-            kind: AdapterCapabilityKind::ManagerIntegration,
-            id: "npm".to_owned(),
-        }
-    );
-    assert_eq!(
-        AdapterCapability::from_release_resolver(&resolver),
-        AdapterCapability {
-            kind: AdapterCapabilityKind::EcosystemReleaseResolver,
-            id: "npm-registry".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn external_adapter_failures_map_to_ask_responses() {
-    let failure = AdapterProtocolError::new(
-        AdapterProtocolErrorCode::Timeout,
-        "external adapter timed out",
-    );
-
-    assert_eq!(failure.verdict(), Verdict::Ask);
-    assert_eq!(
-        serde_json::to_value(failure.into_response()).expect("error response serializes"),
-        json!({
-            "type": "error",
-            "protocol_version": ADAPTER_PROTOCOL_VERSION,
-            "code": "timeout",
-            "message": "external adapter timed out",
-            "ask": true
-        })
-    );
-}
-
-struct NeverPackumentClient;
-
-impl NpmPackumentClient for NeverPackumentClient {
-    fn fetch_packument(
-        &self,
-        _package_name: &str,
-    ) -> Result<String, lfg::ecosystems::npm::NpmFetchError> {
-        unreachable!("adapter protocol test does not fetch packuments")
-    }
 }

@@ -37,10 +37,7 @@ impl NpmPackumentClient for NpmHttpPackumentClient {
         );
 
         ureq::get(&url)
-            .header(
-                "Accept",
-                "application/vnd.npm.install-v1+json, application/json",
-            )
+            .header("Accept", "application/json")
             .call()
             .map_err(|error| NpmFetchError::Unavailable(error.to_string()))?
             .body_mut()
