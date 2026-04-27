@@ -1,9 +1,0 @@
-mod crates_io;
-mod crates_io_http;
-mod npm;
-mod npm_http;
-mod npm_review;
-mod pypi;
-mod pypi_http;
-mod rubygems;
-mod rubygems_http;

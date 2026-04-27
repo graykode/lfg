@@ -1,25 +1,20 @@
-# Test Layout
+# Integration Test Layout
 
-Keep tests at the highest useful layer. Prefer tests that protect product
-behavior over tests that only restate implementation structure.
+Keep `tests/` for integration tests that execute the user-facing CLI or shim
+flow. Unit and component tests should live under `src/` next to the code they
+exercise.
 
-## Primary Test Layers
+## Belongs Here
 
-- `contracts/cli`: end-to-end CLI and shim behavior. These tests protect the
-  user-facing install guard contract.
-- `managers`: package manager argument parsing and real command construction.
-  Put option-safety tests here.
-- `ecosystems`: registry metadata parsing and HTTP request contracts for npm,
-  PyPI, crates.io, and RubyGems.
-- `evidence`: archive fetching, source extraction, diffs, and review evidence.
-- `providers`: local review provider execution and provider output parsing.
-- `core`: shared policy, verdict, outcome, and install assessment behavior.
-- `wiring`: built-in registry smoke tests for managers, resolvers, policies,
-  and providers.
+- CLI behavior such as `lfg npm install ...`.
+- Shim behavior such as invoking lfg through an `npm` shim.
+- End-to-end manager execution after policy/provider pass decisions.
+- End-to-end fail-to-ask behavior when install review cannot proceed.
 
-## Avoid
+## Belongs Under `src/`
 
-- Duplicating manager or ecosystem behavior in lower-level contract tests.
-- Tests that only prove public modules can be imported.
-- Separate tests per ecosystem when a shared core test already covers the
-  behavior and wiring only needs to prove the ecosystem is registered.
+- Manager argument parsing.
+- Registry metadata parsing and HTTP request contracts.
+- Archive extraction, source diffing, and prompt construction.
+- Provider output parsing and local provider execution.
+- Built-in wiring smoke tests.

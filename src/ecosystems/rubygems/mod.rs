@@ -6,3 +6,8 @@ pub use registry::{
     RubyGemsFetchError, RubyGemsHttpVersionsClient, RubyGemsRegistryResolver,
     RubyGemsVersionsClient,
 };
+
+#[cfg(test)]
+mod http_tests;
+#[cfg(test)]
+mod registry_tests;

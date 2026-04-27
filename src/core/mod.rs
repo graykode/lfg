@@ -19,3 +19,6 @@ pub use policy::*;
 pub use registry::*;
 pub use release_age::*;
 pub use verdict::*;
+
+#[cfg(test)]
+mod install_assessment_tests;
