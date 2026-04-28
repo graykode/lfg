@@ -15,7 +15,7 @@ fn temp_requirements_file(content: &str) -> String {
         .duration_since(UNIX_EPOCH)
         .expect("system clock after epoch")
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("lfg-requirements-{nanos}.txt"));
+    let path = std::env::temp_dir().join(format!("packvet-requirements-{nanos}.txt"));
     fs::write(&path, content).expect("write requirements file");
     path.to_string_lossy().into_owned()
 }
@@ -126,10 +126,10 @@ fn reports_unavailable_requirements_file() {
         PipManagerAdapter.parse_install(&args(&[
             "install",
             "-r",
-            "/tmp/lfg-missing-requirements.txt"
+            "/tmp/packvet-missing-requirements.txt"
         ])),
         Err(ManagerAdapterError::RequirementsFileUnavailable(
-            "/tmp/lfg-missing-requirements.txt".to_owned()
+            "/tmp/packvet-missing-requirements.txt".to_owned()
         ))
     );
 }

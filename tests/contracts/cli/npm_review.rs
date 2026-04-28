@@ -1,7 +1,7 @@
 use std::fs;
 
 use super::support::{
-    path_with_fake_bin, run_lfg_with_registry_and_now, run_lfg_with_registry_now_and_env,
+    path_with_fake_bin, run_packvet_with_registry_and_now, run_packvet_with_registry_now_and_env,
     serve_recent_package_with_archives, temp_test_dir, write_fake_claude_bin, write_fake_npm_bin,
 };
 
@@ -9,7 +9,7 @@ use super::support::{
 fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
 
-    let output = run_lfg_with_registry_and_now(
+    let output = run_packvet_with_registry_and_now(
         &["npm", "install", "recent-package"],
         &registry_base_url,
         25 * 60 * 60,
@@ -20,7 +20,7 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
     let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
     assert_eq!(
         stderr,
-        "lfg: review required for npm install, but provider review is not wired yet. install is paused.\n"
+        "packvet: review required for npm install, but provider review is not wired yet. install is paused.\n"
     );
 
     let requests = server.join().expect("server thread completes");
@@ -37,7 +37,7 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
 #[test]
 fn explicit_recent_npm_install_executes_real_npm_after_provider_pass() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
-    let temp_dir = temp_test_dir("lfg-fake-provider-pass");
+    let temp_dir = temp_test_dir("packvet-fake-provider-pass");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     let fake_prompt_path = temp_dir.join("provider-prompt.txt");
@@ -47,19 +47,19 @@ fn explicit_recent_npm_install_executes_real_npm_after_provider_pass() {
         "verdict: pass\nreason: fixture allowed\n\nevidence:\n- package/index.js: fixture signal\n",
     );
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["npm", "install", "recent-package"],
         &registry_base_url,
         25 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
-            ("LFG_REVIEW_PROVIDER", "claude".to_owned()),
+            ("PACKVET_REVIEW_PROVIDER", "claude".to_owned()),
             (
-                "LFG_FAKE_NPM_ARGS",
+                "PACKVET_FAKE_NPM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
             (
-                "LFG_FAKE_PROVIDER_PROMPT",
+                "PACKVET_FAKE_PROVIDER_PROMPT",
                 fake_prompt_path.to_string_lossy().into_owned(),
             ),
         ],
@@ -93,7 +93,7 @@ fn explicit_recent_npm_install_executes_real_npm_after_provider_pass() {
 #[test]
 fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
-    let temp_dir = temp_test_dir("lfg-fake-provider-block");
+    let temp_dir = temp_test_dir("packvet-fake-provider-block");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     let fake_prompt_path = temp_dir.join("provider-prompt.txt");
@@ -103,19 +103,19 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
         "verdict: block\nreason: fixture blocked\n\nevidence:\n- package/index.js: fixture signal\n",
     );
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["npm", "install", "recent-package"],
         &registry_base_url,
         25 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
-            ("LFG_REVIEW_PROVIDER", "claude".to_owned()),
+            ("PACKVET_REVIEW_PROVIDER", "claude".to_owned()),
             (
-                "LFG_FAKE_NPM_ARGS",
+                "PACKVET_FAKE_NPM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
             (
-                "LFG_FAKE_PROVIDER_PROMPT",
+                "PACKVET_FAKE_PROVIDER_PROMPT",
                 fake_prompt_path.to_string_lossy().into_owned(),
             ),
         ],
@@ -125,7 +125,7 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "lfg: npm install was blocked by provider review.\n"
+        "packvet: npm install was blocked by provider review.\n"
     );
     assert!(!fake_args_path.exists());
     let prompt = fs::read_to_string(&fake_prompt_path).expect("provider prompt is captured");
@@ -139,25 +139,75 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
 }
 
 #[test]
+fn explicit_recent_npm_install_can_print_review_prompt_for_debugging() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+    let temp_dir = temp_test_dir("packvet-print-provider-prompt");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    let fake_prompt_path = temp_dir.join("provider-prompt.txt");
+    write_fake_npm_bin(&fake_bin_dir);
+    write_fake_claude_bin(
+        &fake_bin_dir,
+        "verdict: block\nreason: fixture blocked\n\nevidence:\n- package/index.js: fixture signal\n",
+    );
+
+    let output = run_packvet_with_registry_now_and_env(
+        &["npm", "install", "recent-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            ("PACKVET_REVIEW_PROVIDER", "claude".to_owned()),
+            ("PACKVET_PRINT_REVIEW_PROMPT", "1".to_owned()),
+            (
+                "PACKVET_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "PACKVET_FAKE_PROVIDER_PROMPT",
+                fake_prompt_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(30));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert!(stderr.contains("----- packvet review prompt -----\n"));
+    assert!(stderr.contains("package: recent-package"));
+    assert!(stderr.contains("previous version: 1.0.0"));
+    assert!(stderr.contains("target version: 1.1.0"));
+    assert!(stderr.contains("+module.exports = 2;"));
+    assert!(stderr.contains("----- end packvet review prompt -----\n"));
+    assert!(stderr.ends_with("packvet: npm install was blocked by provider review.\n"));
+    assert!(!fake_args_path.exists());
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+
+    fs::remove_dir_all(temp_dir).expect("remove fake provider temp dir");
+}
+
+#[test]
 fn explicit_npm_install_uses_configured_review_age_threshold() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
-    let temp_dir = temp_test_dir("lfg-fake-threshold");
+    let temp_dir = temp_test_dir("packvet-fake-threshold");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     write_fake_npm_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["npm", "install", "recent-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_NPM_ARGS",
+                "PACKVET_FAKE_NPM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
             (
-                "LFG_REVIEW_AGE_THRESHOLD_SECONDS",
+                "PACKVET_REVIEW_AGE_THRESHOLD_SECONDS",
                 (48 * 60 * 60).to_string(),
             ),
         ],
@@ -167,7 +217,7 @@ fn explicit_npm_install_uses_configured_review_age_threshold() {
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "lfg: review required for npm install, but provider review is not wired yet. install is paused.\n"
+        "packvet: review required for npm install, but provider review is not wired yet. install is paused.\n"
     );
     assert!(!fake_args_path.exists());
 

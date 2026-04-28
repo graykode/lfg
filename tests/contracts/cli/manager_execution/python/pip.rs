@@ -3,26 +3,26 @@ use std::fs;
 
 use crate::cli::manager_execution::python::OLD_PYTHON_PROJECT;
 use crate::cli::support::{
-    path_with_fake_bin, run_lfg_with_pypi_registry_now_and_env, serve_json_paths_once,
+    path_with_fake_bin, run_packvet_with_pypi_registry_now_and_env, serve_json_paths_once,
     serve_packument_once, temp_test_dir, write_fake_pip_bin,
 };
 
 #[test]
 fn explicit_old_pip_install_executes_real_pip_after_policy_pass() {
     let (registry_base_url, server) = serve_packument_once(OLD_PYTHON_PROJECT);
-    let temp_dir = temp_test_dir("lfg-fake-pip");
+    let temp_dir = temp_test_dir("packvet-fake-pip");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("pip-args.txt");
     write_fake_pip_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_pypi_registry_now_and_env(
+    let output = run_packvet_with_pypi_registry_now_and_env(
         &["pip", "install", "old-python-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_PIP_ARGS",
+                "PACKVET_FAKE_PIP_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],
@@ -96,7 +96,7 @@ fn explicit_old_pip_requirements_install_executes_real_pip_after_policy_pass() {
             second_project.to_owned(),
         ),
     ]));
-    let temp_dir = temp_test_dir("lfg-fake-pip-requirements");
+    let temp_dir = temp_test_dir("packvet-fake-pip-requirements");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("pip-args.txt");
     let requirements_path = temp_dir.join("requirements.txt");
@@ -108,14 +108,14 @@ fn explicit_old_pip_requirements_install_executes_real_pip_after_policy_pass() {
     .expect("write requirements file");
     write_fake_pip_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_pypi_registry_now_and_env(
+    let output = run_packvet_with_pypi_registry_now_and_env(
         &["pip", "install", "-r", &requirements_path.to_string_lossy()],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_PIP_ARGS",
+                "PACKVET_FAKE_PIP_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],

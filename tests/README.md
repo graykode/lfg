@@ -6,8 +6,8 @@ exercise.
 
 ## Belongs Here
 
-- CLI behavior such as `lfg npm install ...`.
-- Shim behavior such as invoking lfg through an `npm` shim.
+- CLI behavior such as `packvet npm install ...`.
+- Shim behavior such as invoking packvet through an `npm` shim.
 - End-to-end manager execution after policy/provider pass decisions.
 - End-to-end fail-to-ask behavior when install review cannot proceed.
 

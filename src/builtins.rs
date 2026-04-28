@@ -35,13 +35,13 @@ pub struct AdapterConfig {
 impl AdapterConfig {
     pub fn from_env() -> Self {
         Self {
-            crates_io_registry_base_url: env::var("LFG_CRATES_IO_REGISTRY_URL")
+            crates_io_registry_base_url: env::var("PACKVET_CRATES_IO_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://crates.io".to_owned()),
-            npm_registry_base_url: env::var("LFG_NPM_REGISTRY_URL")
+            npm_registry_base_url: env::var("PACKVET_NPM_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://registry.npmjs.org".to_owned()),
-            pypi_registry_base_url: env::var("LFG_PYPI_REGISTRY_URL")
+            pypi_registry_base_url: env::var("PACKVET_PYPI_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://pypi.org".to_owned()),
-            rubygems_registry_base_url: env::var("LFG_RUBYGEMS_REGISTRY_URL")
+            rubygems_registry_base_url: env::var("PACKVET_RUBYGEMS_REGISTRY_URL")
                 .unwrap_or_else(|_| "https://rubygems.org".to_owned()),
         }
     }
@@ -82,7 +82,7 @@ impl PolicyConfig {
 }
 
 fn configured_review_age_threshold() -> Result<Option<Duration>, PolicyConfigError> {
-    let value = match env::var("LFG_REVIEW_AGE_THRESHOLD_SECONDS") {
+    let value = match env::var("PACKVET_REVIEW_AGE_THRESHOLD_SECONDS") {
         Ok(value) => value,
         Err(env::VarError::NotPresent) => return Ok(None),
         Err(env::VarError::NotUnicode(_)) => {
@@ -114,7 +114,7 @@ pub enum ReviewProviderPreference {
 
 impl ReviewProviderPreference {
     fn from_env() -> Self {
-        match env::var("LFG_REVIEW_PROVIDER").ok().as_deref() {
+        match env::var("PACKVET_REVIEW_PROVIDER").ok().as_deref() {
             Some("auto") | Some("") | None => Self::Auto,
             Some("claude") | Some("claude-cli") => Self::ClaudeCli,
             Some("codex") | Some("codex-cli") => Self::CodexCli,

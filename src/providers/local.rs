@@ -1,4 +1,5 @@
-use std::io::Write;
+use std::env;
+use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
 use crate::providers::{ProviderError, ReviewPrompt, ReviewProvider};
@@ -30,6 +31,10 @@ impl ReviewProvider for CommandReviewProvider {
     }
 
     fn review(&self, prompt: &ReviewPrompt) -> Result<String, ProviderError> {
+        if should_print_review_prompt() {
+            write_review_prompt_to_stderr(prompt);
+        }
+
         let mut child = Command::new(&self.program)
             .args(&self.args)
             .stdin(Stdio::piped())
@@ -66,4 +71,25 @@ impl ReviewProvider for CommandReviewProvider {
 
         String::from_utf8(output.stdout).map_err(|error| ProviderError::Failure(error.to_string()))
     }
+}
+
+fn should_print_review_prompt() -> bool {
+    matches!(
+        env::var("PACKVET_PRINT_REVIEW_PROMPT").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    )
+}
+
+fn write_review_prompt_to_stderr(prompt: &ReviewPrompt) {
+    let mut stderr = io::stderr().lock();
+    let _ = writeln!(stderr, "----- packvet review prompt -----")
+        .and_then(|_| write!(stderr, "{}", prompt.text))
+        .and_then(|_| {
+            if prompt.text.ends_with('\n') {
+                Ok(())
+            } else {
+                writeln!(stderr)
+            }
+        })
+        .and_then(|_| writeln!(stderr, "----- end packvet review prompt -----"));
 }

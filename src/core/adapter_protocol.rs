@@ -54,7 +54,7 @@ pub enum AdapterCapabilityKind {
 pub enum AdapterProtocolRequest {
     Handshake {
         protocol_version: u16,
-        lfg_version: String,
+        packvet_version: String,
     },
     Capabilities {
         protocol_version: u16,
@@ -78,10 +78,10 @@ pub enum AdapterProtocolRequest {
 }
 
 impl AdapterProtocolRequest {
-    pub fn handshake(lfg_version: impl Into<String>) -> Self {
+    pub fn handshake(packvet_version: impl Into<String>) -> Self {
         Self::Handshake {
             protocol_version: ADAPTER_PROTOCOL_VERSION,
-            lfg_version: lfg_version.into(),
+            packvet_version: packvet_version.into(),
         }
     }
 

@@ -75,6 +75,31 @@ cargo clippy -- -D warnings
 cargo fmt
 ```
 
+## Sandboxed Smoke Tests
+
+Use Docker for smoke tests that may execute a real package manager. The
+container is disposable, mounts the repository read-only, copies it into an
+isolated workspace, disables npm lifecycle scripts, and runs the package
+manager from a temporary project directory.
+
+```bash
+scripts/sandbox-npm-install.sh left-pad
+```
+
+To inspect the exact prompt that would be sent to a local review provider,
+print it through a fake in-container provider:
+
+```bash
+scripts/sandbox-npm-install.sh --print-prompt left-pad
+```
+
+Prompt print mode blocks before the real install command runs.
+
+For direct local-provider runs, `PACKVET_PRINT_REVIEW_PROMPT=1` prints the
+review prompt to stderr before invoking the provider.
+
+This script is opt-in because it requires Docker and live network access.
+
 Before finishing implementation work, run at least:
 
 ```bash

@@ -76,8 +76,8 @@ fn configured_review_provider_returns_unavailable_when_missing() {
 
 #[test]
 fn built_in_review_provider_can_be_disabled_by_env() {
-    let previous = env::var_os("LFG_REVIEW_PROVIDER");
-    env::set_var("LFG_REVIEW_PROVIDER", "none");
+    let previous = env::var_os("PACKVET_REVIEW_PROVIDER");
+    env::set_var("PACKVET_REVIEW_PROVIDER", "none");
 
     let provider = built_in_review_provider(&StaticProgramDetector {
         claude: true,
@@ -85,8 +85,8 @@ fn built_in_review_provider_can_be_disabled_by_env() {
     });
 
     match previous {
-        Some(value) => env::set_var("LFG_REVIEW_PROVIDER", value),
-        None => env::remove_var("LFG_REVIEW_PROVIDER"),
+        Some(value) => env::set_var("PACKVET_REVIEW_PROVIDER", value),
+        None => env::remove_var("PACKVET_REVIEW_PROVIDER"),
     }
 
     assert_eq!(provider.id(), "unavailable");

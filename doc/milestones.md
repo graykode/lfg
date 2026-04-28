@@ -14,7 +14,7 @@ or real LLM providers.
 
 Scope:
 
-- Rust binary named `lfg`.
+- Rust binary named `packvet`.
 - Verdict and exit-code model from `policy.md`.
 - Review policy decision table from `policy.md`.
 - Structured LLM output parser.
@@ -36,7 +36,7 @@ adapter before installing command shims.
 
 Scope:
 
-- Explicit wrapper command for npm, such as `lfg npm install <package>`.
+- Explicit wrapper command for npm, such as `packvet npm install <package>`.
 - npm manager integration adapter.
 - npm registry release resolver.
 - Archive diff using the baseline defined in `policy.md`.
@@ -54,7 +54,7 @@ Exit criteria:
 
 ## Milestone 2: Command Shim Install
 
-Goal: make normal user commands pass through lfg before the real package
+Goal: make normal user commands pass through packvet before the real package
 manager runs.
 
 Scope:
@@ -70,7 +70,7 @@ Scope:
 
 Exit criteria:
 
-- Typing `npm i <package>` can invoke lfg first through the configured
+- Typing `npm i <package>` can invoke packvet first through the configured
   interception path.
 - The real npm binary only runs after pass or explicit user confirmation.
 - The docs distinguish convenience aliases/functions from PATH shims.
@@ -117,7 +117,7 @@ Exit criteria:
 - Built-in adapters and external executable adapters can be described by
   the same logical contract.
 - Dynamic library loading is not required.
-- lfg still ships as a single binary.
+- packvet still ships as a single binary.
 
 ## Milestone 5: More Managers
 

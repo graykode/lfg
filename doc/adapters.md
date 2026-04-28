@@ -1,6 +1,6 @@
 # Adapters
 
-lfg is adapter-based from the start.
+packvet is adapter-based from the start.
 
 The target architecture is plugin-compatible, but the first implementation
 does not need a full external plugin runtime. Built-in adapters should use
@@ -8,7 +8,7 @@ the same contracts that future external adapters will use.
 
 ## Adapter Types
 
-lfg has three adapter families:
+packvet has three adapter families:
 
 - manager integration adapters
 - ecosystem release resolvers
@@ -154,7 +154,7 @@ The extension model prefers external executable adapters.
 
 Rationale:
 
-- lfg can still ship as a single binary.
+- packvet can still ship as a single binary.
 - External adapters do not require dynamic library loading.
 - JSON over stdin/stdout is auditable and testable.
 - Adapter failures can be mapped cleanly to `ask`.
@@ -166,8 +166,8 @@ manager execution.
 
 The process model is one request per process invocation:
 
-- lfg starts the adapter executable.
-- lfg writes one JSON request to stdin.
+- packvet starts the adapter executable.
+- packvet writes one JSON request to stdin.
 - the adapter writes one JSON response to stdout.
 - stderr is diagnostic text only and must not contain secrets.
 - timeout, non-zero exit, malformed JSON, unsupported protocol versions, and
@@ -189,7 +189,7 @@ The first request should be a handshake:
 {
   "type": "handshake",
   "protocol_version": 1,
-  "lfg_version": "0.1.0"
+  "packvet_version": "0.1.0"
 }
 ```
 
@@ -306,7 +306,7 @@ Successful response:
 
 ### LLM Adapter Request
 
-LLM adapters execute a provider and return raw provider output. lfg still
+LLM adapters execute a provider and return raw provider output. packvet still
 parses the final verdict according to `policy.md`.
 
 ```json
@@ -354,8 +354,8 @@ Supported error codes:
 - `timeout`
 - `failed`
 
-All adapter errors are install pauses. lfg must map them to `ask`, never
+All adapter errors are install pauses. packvet must map them to `ask`, never
 silent pass. If an adapter omits `ask`, returns `ask: false`, exits
 non-zero, times out, writes malformed JSON, or writes a response with the
-wrong `protocol_version`, lfg treats the adapter as failed and pauses the
+wrong `protocol_version`, packvet treats the adapter as failed and pauses the
 install with `ask`.

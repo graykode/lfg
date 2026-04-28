@@ -10,7 +10,7 @@ fn temp_prompt_path() -> PathBuf {
         .expect("system clock after epoch")
         .as_nanos();
 
-    std::env::temp_dir().join(format!("lfg-provider-prompt-{nanos}.txt"))
+    std::env::temp_dir().join(format!("packvet-provider-prompt-{nanos}.txt"))
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn command_provider_sends_prompt_to_stdin_and_returns_stdout() {
 fn command_provider_maps_missing_command_to_unavailable() {
     let provider = CommandReviewProvider::new(
         "missing",
-        "definitely-missing-lfg-provider-command",
+        "definitely-missing-packvet-provider-command",
         Vec::<String>::new(),
     );
 

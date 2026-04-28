@@ -1,17 +1,17 @@
 # Architecture
 
-lfg is a local pre-install gate. It runs before the real package manager
+packvet is a local pre-install gate. It runs before the real package manager
 executes an install command.
 
 The primary integration path is command interception. The initial version
-can install shell aliases or functions such as `npm -> lfg npm` for
+can install shell aliases or functions such as `npm -> packvet npm` for
 convenience. The durable transparent guard is a PATH shim, because it works
 outside interactive shell alias expansion and is harder to bypass
 accidentally.
 
 In the strongest form, a shim named `npm`, `pip`, `uv`, or another manager
-name is placed before the real binary on `PATH`. The shim calls lfg, lfg
-reviews the requested install, and only then does lfg execute the real
+name is placed before the real binary on `PATH`. The shim calls packvet, packvet
+reviews the requested install, and only then does packvet execute the real
 package manager.
 
 Package-controlled lifecycle scripts such as `package.json` `preinstall`,
@@ -95,21 +95,21 @@ The command shim is the normal product entrypoint.
 
 Responsibilities:
 
-- identify the requested manager from `argv[0]` or explicit lfg arguments
+- identify the requested manager from `argv[0]` or explicit packvet arguments
 - pass the original arguments to the matching manager integration adapter
 - avoid recursion when finding the real manager binary
 - preserve stdin, stdout, stderr, environment, and exit behavior where safe
 - run the real package manager only after the install gate allows it
-- honor `LFG_BYPASS=1` as an emergency path that skips review and runs the
+- honor `PACKVET_BYPASS=1` as an emergency path that skips review and runs the
   real package manager directly
 
 Shell aliases or functions are acceptable as convenience setup because they
 are simple, reversible, and familiar. They are not a complete security
 boundary.
 
-PATH shim setup is explicit and reversible. `lfg shim install --dir <dir>
-npm` creates an `npm` shim in the chosen directory, and `lfg shim uninstall
---dir <dir> npm` removes only shims that point back to the current lfg
+PATH shim setup is explicit and reversible. `packvet shim install --dir <dir>
+npm` creates an `npm` shim in the chosen directory, and `packvet shim uninstall
+--dir <dir> npm` removes only shims that point back to the current packvet
 executable.
 
 Native trusted hooks or package-manager plugins can be added when an
@@ -129,7 +129,7 @@ Examples:
 
 An install plan can contain multiple package requests. For example,
 requirements files and workspace commands may expand to many packages.
-If lfg cannot confidently understand the install target, it returns `ask`
+If packvet cannot confidently understand the install target, it returns `ask`
 instead of silently passing.
 
 ## Manager Integration Adapter

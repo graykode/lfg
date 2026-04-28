@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::cli::support::{
-    path_with_fake_bin, run_lfg_with_registry_now_and_env, serve_packument_once, temp_test_dir,
+    path_with_fake_bin, run_packvet_with_registry_now_and_env, serve_packument_once, temp_test_dir,
     write_fake_pnpm_bin, write_fake_yarn_bin,
 };
 
@@ -25,19 +25,19 @@ const OLD_PACKAGE_PACKUMENT: &str = r#"{
 #[test]
 fn explicit_old_pnpm_add_executes_real_pnpm_after_policy_pass() {
     let (registry_base_url, server) = serve_packument_once(OLD_PACKAGE_PACKUMENT);
-    let temp_dir = temp_test_dir("lfg-fake-pnpm");
+    let temp_dir = temp_test_dir("packvet-fake-pnpm");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("pnpm-args.txt");
     write_fake_pnpm_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["pnpm", "add", "old-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_PNPM_ARGS",
+                "PACKVET_FAKE_PNPM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],
@@ -66,19 +66,19 @@ fn explicit_old_pnpm_add_executes_real_pnpm_after_policy_pass() {
 #[test]
 fn explicit_old_yarn_add_executes_real_yarn_after_policy_pass() {
     let (registry_base_url, server) = serve_packument_once(OLD_PACKAGE_PACKUMENT);
-    let temp_dir = temp_test_dir("lfg-fake-yarn");
+    let temp_dir = temp_test_dir("packvet-fake-yarn");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("yarn-args.txt");
     write_fake_yarn_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["yarn", "add", "old-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_YARN_ARGS",
+                "PACKVET_FAKE_YARN_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],

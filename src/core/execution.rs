@@ -143,17 +143,17 @@ mod tests {
 
     #[test]
     fn path_locator_skips_shim_and_uses_next_matching_program() {
-        let temp_dir = temp_test_dir("lfg-command-locator");
+        let temp_dir = temp_test_dir("packvet-command-locator");
         let shim_dir = temp_dir.join("shim");
         let real_dir = temp_dir.join("real");
         fs::create_dir_all(&shim_dir).expect("create shim dir");
         fs::create_dir_all(&real_dir).expect("create real dir");
 
-        let lfg_path = temp_dir.join("lfg");
+        let packvet_path = temp_dir.join("packvet");
         let shim_path = shim_dir.join("npm");
         let real_path = real_dir.join("npm");
-        fs::write(&lfg_path, "").expect("write lfg placeholder");
-        symlink(&lfg_path, &shim_path).expect("create shim symlink");
+        fs::write(&packvet_path, "").expect("write packvet placeholder");
+        symlink(&packvet_path, &shim_path).expect("create shim symlink");
         fs::write(&real_path, "").expect("write real npm placeholder");
 
         let locator = PathCommandLocator::new(

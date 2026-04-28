@@ -1,4 +1,4 @@
-# lfg Agent Guide
+# packvet Agent Guide
 
 This file is the entry point for Codex agents working in this repository.
 Keep it short. Put durable product detail in `doc/`.
@@ -33,11 +33,11 @@ archive support gaps such as Ruby `.gem` source extraction.
   - `doc/adapters.md` owns adapter contracts.
   - `doc/milestones.md` owns implementation order.
   - `doc/development.md` owns development rules.
-- lfg is a local pre-install guard. It must run before the real package
+- packvet is a local pre-install guard. It must run before the real package
   manager executes an install command.
-- Package-controlled lifecycle scripts are review evidence, not trusted lfg
+- Package-controlled lifecycle scripts are review evidence, not trusted packvet
   integration points.
-- Do not introduce a hosted lfg service, background daemon, or npm
+- Do not introduce a hosted packvet service, background daemon, or npm
   distribution path.
 - Follow `doc/policy.md` for diff baseline, published-age threshold,
   provider selection, verdicts, exit codes, and fail-to-ask behavior.

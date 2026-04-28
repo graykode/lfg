@@ -116,7 +116,7 @@ fn run_with_ask_confirmer(
         },
         Some(argument) if argument == "--version" || argument == "-V" => CliResponse {
             exit_code: 0,
-            stdout: format!("lfg {}\n", env!("CARGO_PKG_VERSION")),
+            stdout: format!("packvet {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
         Some(argument) if argument == "shim" => run_shim_command(args.collect()),
@@ -170,7 +170,7 @@ fn run_manager(
 
 fn bypass_requested() -> bool {
     matches!(
-        env::var("LFG_BYPASS").ok().as_deref(),
+        env::var("PACKVET_BYPASS").ok().as_deref(),
         Some("1" | "true" | "yes")
     )
 }
@@ -194,33 +194,39 @@ fn run_shim_command(args: Vec<String>) -> CliResponse {
         return unknown_argument_response(manager_id);
     }
 
-    let lfg_executable = match env::current_exe() {
+    let packvet_executable = match env::current_exe() {
         Ok(path) => path,
         Err(error) => {
             return CliResponse {
                 exit_code: Verdict::Ask.exit_code(),
                 stdout: String::new(),
-                stderr: format!("lfg: could not locate lfg executable: {error}\n"),
+                stderr: format!("packvet: could not locate packvet executable: {error}\n"),
             };
         }
     };
 
     match command {
         ShimCommand::Install { manager_id, dir } => {
-            match install_shim(&manager_id, &dir, &lfg_executable) {
+            match install_shim(&manager_id, &dir, &packvet_executable) {
                 Ok(path) => CliResponse {
                     exit_code: 0,
-                    stdout: format!("lfg: installed {manager_id} shim at {}\n", path.display()),
+                    stdout: format!(
+                        "packvet: installed {manager_id} shim at {}\n",
+                        path.display()
+                    ),
                     stderr: String::new(),
                 },
                 Err(error) => shim_setup_error_response(error),
             }
         }
         ShimCommand::Uninstall { manager_id, dir } => {
-            match uninstall_shim(&manager_id, &dir, &lfg_executable) {
+            match uninstall_shim(&manager_id, &dir, &packvet_executable) {
                 Ok(path) => CliResponse {
                     exit_code: 0,
-                    stdout: format!("lfg: removed {manager_id} shim from {}\n", path.display()),
+                    stdout: format!(
+                        "packvet: removed {manager_id} shim from {}\n",
+                        path.display()
+                    ),
                     stderr: String::new(),
                 },
                 Err(error) => shim_setup_error_response(error),
@@ -231,14 +237,14 @@ fn run_shim_command(args: Vec<String>) -> CliResponse {
 
 fn shim_command_error_response(error: ShimCommandError) -> CliResponse {
     let message = match error {
-        ShimCommandError::MissingAction => "lfg: shim action is required\n".to_owned(),
-        ShimCommandError::MissingDir => "lfg: shim --dir is required\n".to_owned(),
-        ShimCommandError::MissingManager => "lfg: shim manager is required\n".to_owned(),
+        ShimCommandError::MissingAction => "packvet: shim action is required\n".to_owned(),
+        ShimCommandError::MissingDir => "packvet: shim --dir is required\n".to_owned(),
+        ShimCommandError::MissingManager => "packvet: shim manager is required\n".to_owned(),
         ShimCommandError::UnsupportedAction(action) => {
-            format!("lfg: unsupported shim action: {action}\n")
+            format!("packvet: unsupported shim action: {action}\n")
         }
         ShimCommandError::UnknownArgument(argument) => {
-            format!("lfg: unknown shim argument: {argument}\n")
+            format!("packvet: unknown shim argument: {argument}\n")
         }
     };
 
@@ -252,12 +258,12 @@ fn shim_command_error_response(error: ShimCommandError) -> CliResponse {
 fn shim_setup_error_response(error: ShimSetupError) -> CliResponse {
     let message = match error {
         ShimSetupError::ExistingPath(path) => {
-            format!("lfg: shim target already exists: {}\n", path.display())
+            format!("packvet: shim target already exists: {}\n", path.display())
         }
-        ShimSetupError::NotLfgShim(path) => {
-            format!("lfg: not an lfg shim: {}\n", path.display())
+        ShimSetupError::NotPackvetShim(path) => {
+            format!("packvet: not a packvet shim: {}\n", path.display())
         }
-        ShimSetupError::Io(error) => format!("lfg: shim setup failed: {error}\n"),
+        ShimSetupError::Io(error) => format!("packvet: shim setup failed: {error}\n"),
     };
 
     CliResponse {
@@ -339,14 +345,15 @@ fn confirm_ask_or_pause<F>(
 where
     F: FnOnce() -> CliResponse,
 {
-    let prompt = format!("{ask_message}lfg: continue with {manager_id} {operation} anyway? [y/N] ");
+    let prompt =
+        format!("{ask_message}packvet: continue with {manager_id} {operation} anyway? [y/N] ");
 
     match confirmer.confirm(&prompt) {
         AskConfirmation::Accepted => execute(),
         AskConfirmation::Declined => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
-            stderr: "lfg: install cancelled by user.\n".to_owned(),
+            stderr: "packvet: install cancelled by user.\n".to_owned(),
         },
         AskConfirmation::Unavailable => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
@@ -397,7 +404,7 @@ fn execute_real_command(
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: format!(
-                "lfg: {} executable is unavailable; install is paused.\n",
+                "packvet: {} executable is unavailable; install is paused.\n",
                 manager_id
             ),
         },
@@ -405,7 +412,7 @@ fn execute_real_command(
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: format!(
-                "lfg: {} execution could not start; install is paused.\n",
+                "packvet: {} execution could not start; install is paused.\n",
                 manager_id
             ),
         },
@@ -416,7 +423,7 @@ fn unknown_argument_response(argument: &str) -> CliResponse {
     CliResponse {
         exit_code: 1,
         stdout: String::new(),
-        stderr: format!("lfg: unknown argument: {argument}\n"),
+        stderr: format!("packvet: unknown argument: {argument}\n"),
     }
 }
 
@@ -425,43 +432,43 @@ fn manager_parse_error_response(manager_id: &str, error: ManagerAdapterError) ->
         ManagerAdapterError::MissingCommand => CliResponse {
             exit_code: 1,
             stdout: String::new(),
-            stderr: format!("lfg: {manager_id} command is required\n"),
+            stderr: format!("packvet: {manager_id} command is required\n"),
         },
         ManagerAdapterError::MissingPackage => CliResponse {
             exit_code: 1,
             stdout: String::new(),
-            stderr: format!("lfg: {manager_id} install needs at least one package\n"),
+            stderr: format!("packvet: {manager_id} install needs at least one package\n"),
         },
         ManagerAdapterError::MissingRequirementsFile => CliResponse {
             exit_code: 1,
             stdout: String::new(),
-            stderr: format!("lfg: {manager_id} requirements file path is required\n"),
+            stderr: format!("packvet: {manager_id} requirements file path is required\n"),
         },
         ManagerAdapterError::RequirementsFileUnavailable(path) => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: format!(
-                "lfg: {manager_id} requirements file is unavailable: {path}; install is paused.\n"
+                "packvet: {manager_id} requirements file is unavailable: {path}; install is paused.\n"
             ),
         },
         ManagerAdapterError::UnsupportedManagerOption(option) => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: format!(
-                "lfg: {manager_id} option cannot be reviewed safely: {option}; install is paused.\n"
+                "packvet: {manager_id} option cannot be reviewed safely: {option}; install is paused.\n"
             ),
         },
         ManagerAdapterError::UnsupportedRequirement(requirement) => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
             stderr: format!(
-                "lfg: {manager_id} requirement cannot be reviewed safely: {requirement}; install is paused.\n"
+                "packvet: {manager_id} requirement cannot be reviewed safely: {requirement}; install is paused.\n"
             ),
         },
         ManagerAdapterError::UnsupportedCommand(command) => CliResponse {
             exit_code: 1,
             stdout: String::new(),
-            stderr: format!("lfg: unsupported {manager_id} command: {command}\n"),
+            stderr: format!("packvet: unsupported {manager_id} command: {command}\n"),
         },
     }
 }
@@ -470,7 +477,7 @@ fn adapter_unavailable_response(manager_id: &str) -> CliResponse {
     CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
-        stderr: format!("lfg: {manager_id} adapter is unavailable; install is paused.\n"),
+        stderr: format!("packvet: {manager_id} adapter is unavailable; install is paused.\n"),
     }
 }
 
@@ -478,7 +485,9 @@ fn evaluator_unavailable_response(manager_id: &str) -> CliResponse {
     CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
-        stderr: format!("lfg: {manager_id} policy evaluator is unavailable; install is paused.\n"),
+        stderr: format!(
+            "packvet: {manager_id} policy evaluator is unavailable; install is paused.\n"
+        ),
     }
 }
 
@@ -486,7 +495,7 @@ fn resolver_unavailable_response(manager_id: &str) -> CliResponse {
     CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
-        stderr: format!("lfg: {manager_id} resolver is unavailable; install is paused.\n"),
+        stderr: format!("packvet: {manager_id} resolver is unavailable; install is paused.\n"),
     }
 }
 
@@ -495,13 +504,13 @@ fn policy_config_error_response(manager_id: &str) -> CliResponse {
         exit_code: Verdict::Ask.exit_code(),
         stdout: String::new(),
         stderr: format!(
-            "lfg: {manager_id} review policy configuration is invalid; install is paused.\n"
+            "packvet: {manager_id} review policy configuration is invalid; install is paused.\n"
         ),
     }
 }
 
 fn current_time() -> SystemTime {
-    env::var("LFG_NOW_UNIX_SECONDS")
+    env::var("PACKVET_NOW_UNIX_SECONDS")
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
         .map(|seconds| SystemTime::UNIX_EPOCH + Duration::from_secs(seconds))
@@ -520,7 +529,7 @@ fn cli_result(
         Verdict::Pass => (
             Verdict::Ask.exit_code(),
             format!(
-                "lfg: {manager_id} {operation} reached pass verdict without execution; install is paused.\n"
+                "packvet: {manager_id} {operation} reached pass verdict without execution; install is paused.\n"
             ),
         ),
         Verdict::Ask => (
@@ -529,7 +538,7 @@ fn cli_result(
         ),
         Verdict::Block => (
             Verdict::Block.exit_code(),
-            format!("lfg: {manager_id} {operation} was blocked by provider review.\n"),
+            format!("packvet: {manager_id} {operation} was blocked by provider review.\n"),
         ),
     }
 }
@@ -549,7 +558,7 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
         )
     }) {
         return format!(
-            "lfg: review required for {manager_id} {operation}, but archive diff review is not wired yet. install is paused.\n"
+            "packvet: review required for {manager_id} {operation}, but archive diff review is not wired yet. install is paused.\n"
         );
     }
 
@@ -559,7 +568,9 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
             PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::RegistryFailure)
         )
     }) {
-        return format!("lfg: {manager_id} registry metadata is unavailable; install is paused.\n");
+        return format!(
+            "packvet: {manager_id} registry metadata is unavailable; install is paused.\n"
+        );
     }
 
     if outcomes.iter().any(|outcome| {
@@ -569,7 +580,7 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
         )
     }) {
         return format!(
-            "lfg: review required for {manager_id} {operation}, but provider review is not wired yet. install is paused.\n"
+            "packvet: review required for {manager_id} {operation}, but provider review is not wired yet. install is paused.\n"
         );
     }
 
@@ -580,7 +591,7 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
         )
     }) {
         return format!(
-            "lfg: {manager_id} package has no previous release to diff; install is paused.\n"
+            "packvet: {manager_id} package has no previous release to diff; install is paused.\n"
         );
     }
 
@@ -591,34 +602,34 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
         )
     }) {
         return format!(
-            "lfg: {manager_id} package publish time is missing or invalid; install is paused.\n"
+            "packvet: {manager_id} package publish time is missing or invalid; install is paused.\n"
         );
     }
 
-    format!("lfg: {manager_id} review could not complete safely; install is paused.\n")
+    format!("packvet: {manager_id} review could not complete safely; install is paused.\n")
 }
 
 fn help_text() -> String {
     "\
-lfg is a local pre-install guard for package managers.
+packvet is a local pre-install guard for package managers.
 
-Usage: lfg [OPTIONS] [MANAGER] [ARGS]
-       lfg shim install --dir <DIR> <MANAGER>
-       lfg shim uninstall --dir <DIR> <MANAGER>
+Usage: packvet [OPTIONS] [MANAGER] [ARGS]
+       packvet shim install --dir <DIR> <MANAGER>
+       packvet shim uninstall --dir <DIR> <MANAGER>
 
 Options:
   -h, --help       Print help
   -V, --version    Print version
 
 Examples:
-  lfg cargo add <crate>
-  lfg gem install <gem>
-  lfg npm install <package>
-  lfg pnpm add <package>
-  lfg yarn add <package>
-  lfg pip install -r requirements.txt
-  lfg uv add <package>
-  lfg shim install --dir ~/.local/bin pnpm
+  packvet cargo add <crate>
+  packvet gem install <gem>
+  packvet npm install <package>
+  packvet pnpm add <package>
+  packvet yarn add <package>
+  packvet pip install -r requirements.txt
+  packvet uv add <package>
+  packvet shim install --dir ~/.local/bin pnpm
 "
     .to_owned()
 }
@@ -629,7 +640,7 @@ mod tests {
 
     #[test]
     fn no_args_returns_ask_without_output() {
-        let response = run(["lfg".to_owned()]);
+        let response = run(["packvet".to_owned()]);
 
         assert_eq!(response.exit_code, 20);
         assert!(response.stdout.is_empty());
@@ -638,20 +649,20 @@ mod tests {
 
     #[test]
     fn help_returns_success_with_usage() {
-        let response = run(["lfg".to_owned(), "--help".to_owned()]);
+        let response = run(["packvet".to_owned(), "--help".to_owned()]);
 
         assert_eq!(response.exit_code, 0);
-        assert!(response.stdout.contains("Usage: lfg"));
+        assert!(response.stdout.contains("Usage: packvet"));
         assert!(response.stderr.is_empty());
     }
 
     #[test]
     fn unknown_arg_returns_cli_misuse() {
-        let response = run(["lfg".to_owned(), "--bad".to_owned()]);
+        let response = run(["packvet".to_owned(), "--bad".to_owned()]);
 
         assert_eq!(response.exit_code, 1);
         assert!(response.stdout.is_empty());
-        assert_eq!(response.stderr, "lfg: unknown argument: --bad\n");
+        assert_eq!(response.stderr, "packvet: unknown argument: --bad\n");
     }
 
     #[test]
@@ -662,14 +673,14 @@ mod tests {
         assert!(response.stdout.is_empty());
         assert_eq!(
             response.stderr,
-            "lfg: npm install needs at least one package\n"
+            "packvet: npm install needs at least one package\n"
         );
     }
 
     #[test]
     fn unsupported_manager_option_pauses_install() {
         let response = run([
-            "lfg".to_owned(),
+            "packvet".to_owned(),
             "pip".to_owned(),
             "install".to_owned(),
             "--index-url".to_owned(),
@@ -681,7 +692,7 @@ mod tests {
         assert!(response.stdout.is_empty());
         assert_eq!(
             response.stderr,
-            "lfg: pip option cannot be reviewed safely: --index-url; install is paused.\n"
+            "packvet: pip option cannot be reviewed safely: --index-url; install is paused.\n"
         );
     }
 
@@ -708,7 +719,7 @@ mod tests {
         let response = confirm_ask_or_pause(
             "npm",
             "install",
-            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            "packvet: review could not complete safely; install is paused.\n".to_owned(),
             &mut confirmer,
             || CliResponse {
                 exit_code: 0,
@@ -722,7 +733,7 @@ mod tests {
         assert_eq!(
             confirmer.prompts,
             vec![
-                "lfg: review could not complete safely; install is paused.\nlfg: continue with npm install anyway? [y/N] "
+                "packvet: review could not complete safely; install is paused.\npackvet: continue with npm install anyway? [y/N] "
             ]
         );
     }
@@ -737,7 +748,7 @@ mod tests {
         let response = confirm_ask_or_pause(
             "npm",
             "install",
-            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            "packvet: review could not complete safely; install is paused.\n".to_owned(),
             &mut confirmer,
             || CliResponse {
                 exit_code: 0,
@@ -748,7 +759,7 @@ mod tests {
 
         assert_eq!(response.exit_code, 20);
         assert!(response.stdout.is_empty());
-        assert_eq!(response.stderr, "lfg: install cancelled by user.\n");
+        assert_eq!(response.stderr, "packvet: install cancelled by user.\n");
     }
 
     #[test]
@@ -761,7 +772,7 @@ mod tests {
         let response = confirm_ask_or_pause(
             "npm",
             "install",
-            "lfg: review could not complete safely; install is paused.\n".to_owned(),
+            "packvet: review could not complete safely; install is paused.\n".to_owned(),
             &mut confirmer,
             || CliResponse {
                 exit_code: 0,
@@ -774,7 +785,7 @@ mod tests {
         assert!(response.stdout.is_empty());
         assert_eq!(
             response.stderr,
-            "lfg: review could not complete safely; install is paused.\n"
+            "packvet: review could not complete safely; install is paused.\n"
         );
     }
 }

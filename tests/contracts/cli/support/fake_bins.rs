@@ -7,7 +7,7 @@ pub(crate) fn write_fake_npm_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "npm",
-        "LFG_FAKE_NPM_ARGS",
+        "PACKVET_FAKE_NPM_ARGS",
         "fake npm stdout",
         "fake npm stderr",
     );
@@ -17,7 +17,7 @@ pub(crate) fn write_fake_cargo_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "cargo",
-        "LFG_FAKE_CARGO_ARGS",
+        "PACKVET_FAKE_CARGO_ARGS",
         "fake cargo stdout",
         "fake cargo stderr",
     );
@@ -27,7 +27,7 @@ pub(crate) fn write_fake_gem_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "gem",
-        "LFG_FAKE_GEM_ARGS",
+        "PACKVET_FAKE_GEM_ARGS",
         "fake gem stdout",
         "fake gem stderr",
     );
@@ -37,7 +37,7 @@ pub(crate) fn write_fake_pip_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "pip",
-        "LFG_FAKE_PIP_ARGS",
+        "PACKVET_FAKE_PIP_ARGS",
         "fake pip stdout",
         "fake pip stderr",
     );
@@ -47,7 +47,7 @@ pub(crate) fn write_fake_pnpm_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "pnpm",
-        "LFG_FAKE_PNPM_ARGS",
+        "PACKVET_FAKE_PNPM_ARGS",
         "fake pnpm stdout",
         "fake pnpm stderr",
     );
@@ -57,7 +57,7 @@ pub(crate) fn write_fake_uv_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "uv",
-        "LFG_FAKE_UV_ARGS",
+        "PACKVET_FAKE_UV_ARGS",
         "fake uv stdout",
         "fake uv stderr",
     );
@@ -67,7 +67,7 @@ pub(crate) fn write_fake_yarn_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,
         "yarn",
-        "LFG_FAKE_YARN_ARGS",
+        "PACKVET_FAKE_YARN_ARGS",
         "fake yarn stdout",
         "fake yarn stderr",
     );
@@ -86,10 +86,10 @@ fn write_fake_manager_bin(dir: &Path, manager: &str, args_env: &str, stdout: &st
     mark_executable(&manager_path);
 }
 
-pub(crate) fn write_lfg_shim(dir: &Path, name: &str) -> PathBuf {
+pub(crate) fn write_packvet_shim(dir: &Path, name: &str) -> PathBuf {
     fs::create_dir_all(dir).expect("create shim bin dir");
     let shim_path = dir.join(name);
-    symlink(env!("CARGO_BIN_EXE_lfg"), &shim_path).expect("create lfg shim symlink");
+    symlink(env!("CARGO_BIN_EXE_packvet"), &shim_path).expect("create packvet shim symlink");
     shim_path
 }
 
@@ -99,7 +99,7 @@ pub(crate) fn write_fake_claude_bin(dir: &Path, provider_output: &str) {
     fs::write(
         &claude_path,
         format!(
-            "#!/bin/sh\ncat > \"$LFG_FAKE_PROVIDER_PROMPT\"\ncat <<'LFG_PROVIDER_OUTPUT'\n{provider_output}LFG_PROVIDER_OUTPUT\n"
+            "#!/bin/sh\ncat > \"$PACKVET_FAKE_PROVIDER_PROMPT\"\ncat <<'PACKVET_PROVIDER_OUTPUT'\n{provider_output}PACKVET_PROVIDER_OUTPUT\n"
         ),
     )
     .expect("write fake claude");

@@ -2,26 +2,26 @@ use std::fs;
 
 use crate::cli::manager_execution::python::OLD_PYTHON_PROJECT;
 use crate::cli::support::{
-    path_with_fake_bin, run_lfg_with_pypi_registry_now_and_env, serve_packument_once,
+    path_with_fake_bin, run_packvet_with_pypi_registry_now_and_env, serve_packument_once,
     temp_test_dir, write_fake_uv_bin,
 };
 
 #[test]
 fn explicit_old_uv_add_executes_real_uv_after_policy_pass() {
     let (registry_base_url, server) = serve_packument_once(OLD_PYTHON_PROJECT);
-    let temp_dir = temp_test_dir("lfg-fake-uv");
+    let temp_dir = temp_test_dir("packvet-fake-uv");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("uv-args.txt");
     write_fake_uv_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_pypi_registry_now_and_env(
+    let output = run_packvet_with_pypi_registry_now_and_env(
         &["uv", "add", "old-python-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_UV_ARGS",
+                "PACKVET_FAKE_UV_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],

@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::cli::support::{
-    path_with_fake_bin, run_lfg_with_registry_now_and_env, serve_packument_once, temp_test_dir,
+    path_with_fake_bin, run_packvet_with_registry_now_and_env, serve_packument_once, temp_test_dir,
     write_fake_npm_bin,
 };
 
@@ -24,19 +24,19 @@ fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
       }
     }"#;
     let (registry_base_url, server) = serve_packument_once(packument);
-    let temp_dir = temp_test_dir("lfg-fake-npm");
+    let temp_dir = temp_test_dir("packvet-fake-npm");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     write_fake_npm_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_registry_now_and_env(
+    let output = run_packvet_with_registry_now_and_env(
         &["npm", "install", "old-package"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_NPM_ARGS",
+                "PACKVET_FAKE_NPM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],

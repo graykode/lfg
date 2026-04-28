@@ -19,7 +19,7 @@ pub enum ShimCommandError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShimSetupError {
     ExistingPath(PathBuf),
-    NotLfgShim(PathBuf),
+    NotPackvetShim(PathBuf),
     Io(String),
 }
 
@@ -69,27 +69,27 @@ pub fn parse_shim_command(args: &[String]) -> Result<ShimCommand, ShimCommandErr
 pub fn install_shim(
     manager_id: &str,
     dir: &Path,
-    lfg_executable: &Path,
+    packvet_executable: &Path,
 ) -> Result<PathBuf, ShimSetupError> {
     fs::create_dir_all(dir).map_err(|error| ShimSetupError::Io(error.to_string()))?;
     let shim_path = dir.join(manager_id);
 
     if shim_path.exists() || shim_path.symlink_metadata().is_ok() {
-        if is_lfg_shim(&shim_path, lfg_executable) {
+        if is_packvet_shim(&shim_path, packvet_executable) {
             return Ok(shim_path);
         }
 
         return Err(ShimSetupError::ExistingPath(shim_path));
     }
 
-    create_symlink(lfg_executable, &shim_path)?;
+    create_symlink(packvet_executable, &shim_path)?;
     Ok(shim_path)
 }
 
 pub fn uninstall_shim(
     manager_id: &str,
     dir: &Path,
-    lfg_executable: &Path,
+    packvet_executable: &Path,
 ) -> Result<PathBuf, ShimSetupError> {
     let shim_path = dir.join(manager_id);
 
@@ -97,19 +97,19 @@ pub fn uninstall_shim(
         return Ok(shim_path);
     }
 
-    if !is_lfg_shim(&shim_path, lfg_executable) {
-        return Err(ShimSetupError::NotLfgShim(shim_path));
+    if !is_packvet_shim(&shim_path, packvet_executable) {
+        return Err(ShimSetupError::NotPackvetShim(shim_path));
     }
 
     fs::remove_file(&shim_path).map_err(|error| ShimSetupError::Io(error.to_string()))?;
     Ok(shim_path)
 }
 
-fn is_lfg_shim(path: &Path, lfg_executable: &Path) -> bool {
+fn is_packvet_shim(path: &Path, packvet_executable: &Path) -> bool {
     path.symlink_metadata()
         .map(|metadata| metadata.file_type().is_symlink())
         .unwrap_or(false)
-        && same_file(path, lfg_executable)
+        && same_file(path, packvet_executable)
 }
 
 fn same_file(left: &Path, right: &Path) -> bool {

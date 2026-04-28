@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::cli::support::{
-    path_with_fake_bin, run_lfg_with_rubygems_registry_now_and_env, serve_packument_once,
+    path_with_fake_bin, run_packvet_with_rubygems_registry_now_and_env, serve_packument_once,
     temp_test_dir, write_fake_gem_bin,
 };
 
@@ -18,19 +18,19 @@ fn explicit_old_gem_install_executes_real_gem_after_policy_pass() {
       }
     ]"#;
     let (registry_base_url, server) = serve_packument_once(versions);
-    let temp_dir = temp_test_dir("lfg-fake-gem");
+    let temp_dir = temp_test_dir("packvet-fake-gem");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("gem-args.txt");
     write_fake_gem_bin(&fake_bin_dir);
 
-    let output = run_lfg_with_rubygems_registry_now_and_env(
+    let output = run_packvet_with_rubygems_registry_now_and_env(
         &["gem", "install", "rack"],
         &registry_base_url,
         50 * 60 * 60,
         &[
             ("PATH", path_with_fake_bin(&fake_bin_dir)),
             (
-                "LFG_FAKE_GEM_ARGS",
+                "PACKVET_FAKE_GEM_ARGS",
                 fake_args_path.to_string_lossy().into_owned(),
             ),
         ],

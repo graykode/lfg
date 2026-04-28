@@ -1,13 +1,13 @@
 use std::fs;
 
-use super::support::{run_lfg, temp_test_dir};
+use super::support::{run_packvet, temp_test_dir};
 
 #[test]
 fn shim_install_and_uninstall_are_reversible() {
-    let temp_dir = temp_test_dir("lfg-shim-setup");
+    let temp_dir = temp_test_dir("packvet-shim-setup");
     let shim_dir = temp_dir.join("bin");
 
-    let install_output = run_lfg(&[
+    let install_output = run_packvet(&[
         "shim",
         "install",
         "--dir",
@@ -20,16 +20,16 @@ fn shim_install_and_uninstall_are_reversible() {
     assert_eq!(
         String::from_utf8(install_output.stdout).expect("stdout is utf-8"),
         format!(
-            "lfg: installed npm shim at {}\n",
+            "packvet: installed npm shim at {}\n",
             shim_dir.join("npm").display()
         )
     );
     assert_eq!(
         fs::canonicalize(shim_dir.join("npm")).expect("shim target canonicalizes"),
-        fs::canonicalize(env!("CARGO_BIN_EXE_lfg")).expect("lfg binary canonicalizes")
+        fs::canonicalize(env!("CARGO_BIN_EXE_packvet")).expect("packvet binary canonicalizes")
     );
 
-    let uninstall_output = run_lfg(&[
+    let uninstall_output = run_packvet(&[
         "shim",
         "uninstall",
         "--dir",
@@ -42,7 +42,7 @@ fn shim_install_and_uninstall_are_reversible() {
     assert_eq!(
         String::from_utf8(uninstall_output.stdout).expect("stdout is utf-8"),
         format!(
-            "lfg: removed npm shim from {}\n",
+            "packvet: removed npm shim from {}\n",
             shim_dir.join("npm").display()
         )
     );
@@ -53,12 +53,12 @@ fn shim_install_and_uninstall_are_reversible() {
 
 #[test]
 fn shim_install_refuses_to_replace_existing_file() {
-    let temp_dir = temp_test_dir("lfg-shim-existing-file");
+    let temp_dir = temp_test_dir("packvet-shim-existing-file");
     let shim_dir = temp_dir.join("bin");
     fs::create_dir_all(&shim_dir).expect("create shim dir");
-    fs::write(shim_dir.join("npm"), "not managed by lfg").expect("write existing file");
+    fs::write(shim_dir.join("npm"), "not managed by packvet").expect("write existing file");
 
-    let output = run_lfg(&[
+    let output = run_packvet(&[
         "shim",
         "install",
         "--dir",
@@ -71,13 +71,13 @@ fn shim_install_refuses_to_replace_existing_file() {
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
         format!(
-            "lfg: shim target already exists: {}\n",
+            "packvet: shim target already exists: {}\n",
             shim_dir.join("npm").display()
         )
     );
     assert_eq!(
         fs::read_to_string(shim_dir.join("npm")).expect("existing file remains"),
-        "not managed by lfg"
+        "not managed by packvet"
     );
 
     fs::remove_dir_all(temp_dir).expect("remove existing file temp dir");
