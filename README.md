@@ -1,6 +1,6 @@
-# packvet
+# 📦🩺 packvet
 
-packvet is a pre-install guard for package managers.
+packvet = package + vet: a pre-install guard for package managers.
 
 The [Axios npm compromise](https://www.microsoft.com/en-us/security/blog/2026/04/01/mitigating-the-axios-npm-supply-chain-compromise/)
 showed the uncomfortable gap between publish and reputation: a trusted package
