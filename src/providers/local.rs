@@ -1,6 +1,8 @@
 use std::env;
-use std::io::{self, Write};
-use std::process::{Command, Stdio};
+use std::io::{self, Read, Write};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::providers::{ProviderError, ReviewPrompt, ReviewProvider};
 
@@ -9,10 +11,26 @@ pub struct CommandReviewProvider {
     id: &'static str,
     program: String,
     args: Vec<String>,
+    timeout: Duration,
 }
 
 impl CommandReviewProvider {
+    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+
     pub fn new<I, S>(id: &'static str, program: impl Into<String>, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self::with_timeout(id, program, args, Self::DEFAULT_TIMEOUT)
+    }
+
+    pub fn with_timeout<I, S>(
+        id: &'static str,
+        program: impl Into<String>,
+        args: I,
+        timeout: Duration,
+    ) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
@@ -21,6 +39,7 @@ impl CommandReviewProvider {
             id,
             program: program.into(),
             args: args.into_iter().map(Into::into).collect(),
+            timeout,
         }
     }
 }
@@ -60,17 +79,49 @@ impl ReviewProvider for CommandReviewProvider {
             .map_err(|error| ProviderError::Failure(error.to_string()))?;
         drop(stdin);
 
-        let output = child
-            .wait_with_output()
-            .map_err(|error| ProviderError::Failure(error.to_string()))?;
-        if !output.status.success() {
+        let status = wait_with_timeout(&mut child, self.timeout)?;
+        let stdout = read_child_pipe(child.stdout.take())?;
+        let stderr = read_child_pipe(child.stderr.take())?;
+
+        if !status.success() {
             return Err(ProviderError::Failure(
-                String::from_utf8_lossy(&output.stderr).into_owned(),
+                String::from_utf8_lossy(&stderr).into_owned(),
             ));
         }
 
-        String::from_utf8(output.stdout).map_err(|error| ProviderError::Failure(error.to_string()))
+        String::from_utf8(stdout).map_err(|error| ProviderError::Failure(error.to_string()))
     }
+}
+
+fn wait_with_timeout(child: &mut Child, timeout: Duration) -> Result<ExitStatus, ProviderError> {
+    let started_at = Instant::now();
+
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| ProviderError::Failure(error.to_string()))?
+        {
+            return Ok(status);
+        }
+
+        if started_at.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(ProviderError::Timeout);
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn read_child_pipe<R: Read>(pipe: Option<R>) -> Result<Vec<u8>, ProviderError> {
+    let Some(mut pipe) = pipe else {
+        return Ok(Vec::new());
+    };
+    let mut bytes = Vec::new();
+    pipe.read_to_end(&mut bytes)
+        .map_err(|error| ProviderError::Failure(error.to_string()))?;
+    Ok(bytes)
 }
 
 fn should_print_review_prompt() -> bool {

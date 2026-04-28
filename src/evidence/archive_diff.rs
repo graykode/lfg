@@ -1,5 +1,5 @@
 use crate::core::{ArchiveRef, ResolvedPackageReleases};
-use crate::evidence::{read_tgz_source_tree, ArchiveError};
+use crate::evidence::{read_source_archive_tree, ArchiveError};
 use crate::evidence::{DiffEngine, DiffError, SourceDiff};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,9 +62,10 @@ impl<F: ArchiveFetcher, D: DiffEngine> ArchiveDiffBuilder<F, D> {
             .map_err(ArchiveDiffError::Fetch)?;
 
         let previous_tree =
-            read_tgz_source_tree(&previous_archive).map_err(ArchiveDiffError::Archive)?;
-        let target_tree =
-            read_tgz_source_tree(&target_archive).map_err(ArchiveDiffError::Archive)?;
+            read_source_archive_tree(&previous_archive, &releases.previous.archive.url)
+                .map_err(ArchiveDiffError::Archive)?;
+        let target_tree = read_source_archive_tree(&target_archive, &releases.target.archive.url)
+            .map_err(ArchiveDiffError::Archive)?;
 
         self.diff_engine
             .diff(&previous_tree, &target_tree)

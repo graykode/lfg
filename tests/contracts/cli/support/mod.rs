@@ -15,6 +15,8 @@ pub(crate) use fake_bins::{
     write_fake_uv_bin, write_fake_yarn_bin, write_packvet_shim,
 };
 pub(crate) use registry::{
-    serve_json_paths_once, serve_packument_once, serve_recent_package_with_archives,
+    serve_json_paths_once, serve_packument_once, serve_recent_crate_with_archives,
+    serve_recent_gem_with_archives, serve_recent_package_with_archives,
+    serve_recent_python_project_with_archives,
 };
 pub(crate) use temp::temp_test_dir;

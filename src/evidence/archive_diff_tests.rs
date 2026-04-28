@@ -44,6 +44,25 @@ fn tgz(entries: &[(&str, &str)]) -> Vec<u8> {
     encoder.finish().expect("finish gzip")
 }
 
+fn gem(entries: &[(&str, &str)]) -> Vec<u8> {
+    let data_archive = tgz(entries);
+    let mut archive = Vec::new();
+    {
+        let mut builder = Builder::new(&mut archive);
+        let mut header = Header::new_gnu();
+        header.set_path("data.tar.gz").expect("set gem data path");
+        header.set_size(data_archive.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append(&header, data_archive.as_slice())
+            .expect("append gem data");
+        builder.finish().expect("finish gem archive");
+    }
+
+    archive
+}
+
 fn releases() -> ResolvedPackageReleases {
     ResolvedPackageReleases {
         package_name: "demo".to_owned(),
@@ -59,6 +78,26 @@ fn releases() -> ResolvedPackageReleases {
             published_at: "1970-01-02T00:00:00.000Z".to_owned(),
             archive: ArchiveRef {
                 url: "memory://demo-1.1.0.tgz".to_owned(),
+            },
+        },
+    }
+}
+
+fn gem_releases() -> ResolvedPackageReleases {
+    ResolvedPackageReleases {
+        package_name: "demo".to_owned(),
+        previous: ResolvedPackageRelease {
+            version: "1.0.0".to_owned(),
+            published_at: "1970-01-01T00:00:00.000Z".to_owned(),
+            archive: ArchiveRef {
+                url: "memory://demo-1.0.0.gem".to_owned(),
+            },
+        },
+        target: ResolvedPackageRelease {
+            version: "1.1.0".to_owned(),
+            published_at: "1970-01-02T00:00:00.000Z".to_owned(),
+            archive: ArchiveRef {
+                url: "memory://demo-1.1.0.gem".to_owned(),
             },
         },
     }
@@ -93,6 +132,39 @@ diff --git a/package/index.js b/package/index.js
 @@
 -module.exports = 1;
 +module.exports = 2;
+"
+    );
+}
+
+#[test]
+fn builds_source_diff_between_rubygems_gem_archives() {
+    let fetcher = StaticArchiveFetcher {
+        archives: BTreeMap::from([
+            (
+                "memory://demo-1.0.0.gem".to_owned(),
+                gem(&[("lib/demo.rb", "VALUE = 1\n")]),
+            ),
+            (
+                "memory://demo-1.1.0.gem".to_owned(),
+                gem(&[("lib/demo.rb", "VALUE = 2\n")]),
+            ),
+        ]),
+    };
+    let builder = ArchiveDiffBuilder::new(fetcher, UnifiedDiffEngine);
+
+    let diff = builder
+        .build(&gem_releases())
+        .expect("gem archive diff should build");
+
+    assert_eq!(
+        diff.text,
+        "\
+diff --git a/lib/demo.rb b/lib/demo.rb
+--- a/lib/demo.rb
++++ b/lib/demo.rb
+@@
+-VALUE = 1
++VALUE = 2
 "
     );
 }

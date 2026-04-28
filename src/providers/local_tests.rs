@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::providers::{CommandReviewProvider, ProviderError, ReviewPrompt, ReviewProvider};
 
@@ -76,4 +76,21 @@ fn command_provider_maps_nonzero_exit_to_failure() {
         }),
         Err(ProviderError::Failure(_))
     ));
+}
+
+#[test]
+fn command_provider_maps_timeout_to_timeout_error() {
+    let provider = CommandReviewProvider::with_timeout(
+        "slow",
+        "sh",
+        ["-c".to_owned(), "sleep 1".to_owned()],
+        Duration::from_millis(20),
+    );
+
+    assert_eq!(
+        provider.review(&ReviewPrompt {
+            text: "review this diff".to_owned(),
+        }),
+        Err(ProviderError::Timeout)
+    );
 }

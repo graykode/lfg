@@ -1,8 +1,12 @@
 use std::fs;
 
 use super::support::{
-    path_with_fake_bin, run_packvet_with_registry_and_now, run_packvet_with_registry_now_and_env,
-    serve_recent_package_with_archives, temp_test_dir, write_fake_claude_bin, write_fake_npm_bin,
+    path_with_fake_bin, run_packvet_with_crates_io_registry_now_and_env,
+    run_packvet_with_pypi_registry_now_and_env, run_packvet_with_registry_and_now,
+    run_packvet_with_registry_now_and_env, run_packvet_with_rubygems_registry_now_and_env,
+    serve_recent_crate_with_archives, serve_recent_gem_with_archives,
+    serve_recent_package_with_archives, serve_recent_python_project_with_archives, temp_test_dir,
+    write_fake_claude_bin, write_fake_npm_bin,
 };
 
 #[test]
@@ -15,23 +19,136 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
         25 * 60 * 60,
     );
 
-    assert_eq!(output.status.code(), Some(20));
+    assert_recent_review_pause(output, "npm", "install");
 
-    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
-    assert_eq!(
-        stderr,
-        "packvet: review required for npm install, but provider review is not wired yet. install is paused.\n"
+    let requests = server.join().expect("server thread completes");
+    assert_recent_npm_archive_requests(&requests);
+}
+
+#[test]
+fn explicit_recent_pnpm_add_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+
+    let output = run_packvet_with_registry_and_now(
+        &["pnpm", "add", "recent-package"],
+        &registry_base_url,
+        25 * 60 * 60,
     );
+
+    assert_recent_review_pause(output, "pnpm", "add");
+
+    let requests = server.join().expect("server thread completes");
+    assert_recent_npm_archive_requests(&requests);
+}
+
+#[test]
+fn explicit_recent_yarn_add_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+
+    let output = run_packvet_with_registry_and_now(
+        &["yarn", "add", "recent-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+    );
+
+    assert_recent_review_pause(output, "yarn", "add");
+
+    let requests = server.join().expect("server thread completes");
+    assert_recent_npm_archive_requests(&requests);
+}
+
+#[test]
+fn explicit_recent_pip_install_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_python_project_with_archives();
+
+    let output = run_packvet_with_pypi_registry_now_and_env(
+        &["pip", "install", "recent-python-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[],
+    );
+
+    assert_recent_review_pause(output, "pip", "install");
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
-    assert!(requests[0].starts_with("GET /recent-package HTTP/1.1\r\n"));
+    assert!(requests[0].starts_with("GET /pypi/recent-python-package/json HTTP/1.1\r\n"));
+    assert!(requests.iter().any(|request| {
+        request.starts_with("GET /recent-python-package-1.0.0.tar.gz HTTP/1.1\r\n")
+    }));
+    assert!(requests.iter().any(|request| {
+        request.starts_with("GET /recent-python-package-1.1.0.tar.gz HTTP/1.1\r\n")
+    }));
+}
+
+#[test]
+fn explicit_recent_uv_add_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_python_project_with_archives();
+
+    let output = run_packvet_with_pypi_registry_now_and_env(
+        &["uv", "add", "recent-python-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[],
+    );
+
+    assert_recent_review_pause(output, "uv", "add");
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+    assert!(requests[0].starts_with("GET /pypi/recent-python-package/json HTTP/1.1\r\n"));
+    assert!(requests.iter().any(|request| {
+        request.starts_with("GET /recent-python-package-1.0.0.tar.gz HTTP/1.1\r\n")
+    }));
+    assert!(requests.iter().any(|request| {
+        request.starts_with("GET /recent-python-package-1.1.0.tar.gz HTTP/1.1\r\n")
+    }));
+}
+
+#[test]
+fn explicit_recent_cargo_add_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_crate_with_archives();
+
+    let output = run_packvet_with_crates_io_registry_now_and_env(
+        &["cargo", "add", "recent-crate"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[],
+    );
+
+    assert_recent_review_pause(output, "cargo", "add");
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+    assert!(requests[0].starts_with("GET /api/v1/crates/recent-crate HTTP/1.1\r\n"));
+    assert!(requests.iter().any(|request| request
+        .starts_with("GET /api/v1/crates/recent-crate/1.0.0/download HTTP/1.1\r\n")));
+    assert!(requests.iter().any(|request| request
+        .starts_with("GET /api/v1/crates/recent-crate/1.1.0/download HTTP/1.1\r\n")));
+}
+
+#[test]
+fn explicit_recent_gem_install_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_gem_with_archives();
+
+    let output = run_packvet_with_rubygems_registry_now_and_env(
+        &["gem", "install", "recent-gem"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[],
+    );
+
+    assert_recent_review_pause(output, "gem", "install");
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+    assert!(requests[0].starts_with("GET /api/v1/versions/recent-gem.json HTTP/1.1\r\n"));
     assert!(requests
         .iter()
-        .any(|request| request.starts_with("GET /recent-package-1.0.0.tgz HTTP/1.1\r\n")));
+        .any(|request| request.starts_with("GET /gems/recent-gem-1.0.0.gem HTTP/1.1\r\n")));
     assert!(requests
         .iter()
-        .any(|request| request.starts_with("GET /recent-package-1.1.0.tgz HTTP/1.1\r\n")));
+        .any(|request| request.starts_with("GET /gems/recent-gem-1.1.0.gem HTTP/1.1\r\n")));
 }
 
 #[test]
@@ -225,4 +342,26 @@ fn explicit_npm_install_uses_configured_review_age_threshold() {
     assert_eq!(requests.len(), 3);
 
     fs::remove_dir_all(temp_dir).expect("remove fake threshold temp dir");
+}
+
+fn assert_recent_review_pause(output: std::process::Output, manager: &str, operation: &str) {
+    assert_eq!(output.status.code(), Some(20));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("stderr is utf-8"),
+        format!(
+            "packvet: review required for {manager} {operation}, but provider review is not wired yet. install is paused.\n"
+        )
+    );
+}
+
+fn assert_recent_npm_archive_requests(requests: &[String]) {
+    assert_eq!(requests.len(), 3);
+    assert!(requests[0].starts_with("GET /recent-package HTTP/1.1\r\n"));
+    assert!(requests
+        .iter()
+        .any(|request| request.starts_with("GET /recent-package-1.0.0.tgz HTTP/1.1\r\n")));
+    assert!(requests
+        .iter()
+        .any(|request| request.starts_with("GET /recent-package-1.1.0.tgz HTTP/1.1\r\n")));
 }

@@ -105,6 +105,9 @@ The current explicit provider override is `PACKVET_REVIEW_PROVIDER`.
 Provider configuration must not imply a hosted packvet backend. Diffs go from
 the user's machine to the selected provider.
 
+Local provider commands have a 60 second execution timeout. A timeout maps to
+`ask` and must not run the real package manager silently.
+
 ## Verdict Exit Codes
 
 | Exit code | Meaning |
@@ -154,3 +157,5 @@ content first:
 6. largest remaining hunks
 
 The prompt and final user output must disclose truncation when it happens.
+The current local prompt builder caps diff text at 120,000 bytes and discloses
+the shown and original byte counts in the provider prompt.

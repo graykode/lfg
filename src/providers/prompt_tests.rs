@@ -72,3 +72,19 @@ diff --git a/package/index.js b/package/index.js
 "
     );
 }
+
+#[test]
+fn prompt_discloses_truncated_diff_when_context_budget_is_exceeded() {
+    let prompt = DiffReviewPromptBuilder.build_with_max_diff_bytes(
+        &releases(),
+        &SourceDiff {
+            text: "0123456789abcdef".to_owned(),
+        },
+        8,
+    );
+
+    assert!(prompt.text.contains("Diff was truncated by packvet."));
+    assert!(prompt.text.contains("Showing first 8 of 16 bytes"));
+    assert!(prompt.text.contains("01234567"));
+    assert!(!prompt.text.contains("89abcdef"));
+}
