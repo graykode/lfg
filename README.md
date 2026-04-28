@@ -54,6 +54,10 @@ Provider `pass` verdicts print a short review summary and then let the real
 package manager run; `ask` verdicts pause for local confirmation, and `block`
 verdicts stop the install.
 
+Color is enabled automatically on interactive terminals. Set
+`PACKVET_COLOR=never` to disable it, `PACKVET_COLOR=always` to force it, or
+`NO_COLOR=1` to disable color for tools that honor that convention.
+
 Use `PACKVET_BYPASS=1` only as an emergency bypass:
 
 ```bash

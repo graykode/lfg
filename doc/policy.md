@@ -127,6 +127,10 @@ provider reason, and review log path, then allows the real package manager to
 run after the review record is logged. `ask` remains the confirmation path for
 unavailable, timed-out, malformed, or uncertain reviews.
 
+Interactive terminals may highlight packvet-owned status text with ANSI color.
+`NO_COLOR` disables color. `PACKVET_COLOR=never`, `PACKVET_COLOR=always`, and
+`PACKVET_COLOR=auto` explicitly configure color behavior.
+
 Prefer `20` over `1` when packvet can say the review did not complete safely.
 
 ## TTY And Non-Interactive Behavior

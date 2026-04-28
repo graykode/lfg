@@ -375,6 +375,7 @@ fn execute_manager_request(
 }
 
 fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
+    let style = OutputStyle::from_env();
     let mut message = String::new();
 
     for outcome in outcomes {
@@ -397,12 +398,56 @@ fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
             .unwrap_or_else(|| "unavailable".to_owned());
 
         message.push_str(&format!(
-            "packvet: review passed for {} {}\npackvet: reason: {}\npackvet: review log: {}\n",
-            review.package_name, review.version, reason, log_path
+            "packvet: review {} for {} {}\npackvet: {} {}\npackvet: {} {}\n",
+            style.pass("passed"),
+            review.package_name,
+            review.version,
+            style.label("reason:"),
+            reason,
+            style.label("review log:"),
+            style.log_path(&log_path)
         ));
     }
 
     message
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct OutputStyle {
+    color: bool,
+}
+
+impl OutputStyle {
+    fn from_env() -> Self {
+        let color = match env::var("PACKVET_COLOR").ok().as_deref() {
+            Some("always") => true,
+            Some("never") => false,
+            Some("auto") | None => env::var_os("NO_COLOR").is_none() && io::stderr().is_terminal(),
+            Some(_) => env::var_os("NO_COLOR").is_none() && io::stderr().is_terminal(),
+        };
+
+        Self { color }
+    }
+
+    fn pass(&self, value: &str) -> String {
+        self.wrap(value, "\x1b[32m")
+    }
+
+    fn label(&self, value: &str) -> String {
+        self.wrap(value, "\x1b[1m")
+    }
+
+    fn log_path(&self, value: &str) -> String {
+        self.wrap(value, "\x1b[36;4m")
+    }
+
+    fn wrap(&self, value: &str, code: &str) -> String {
+        if self.color {
+            format!("{code}{value}\x1b[0m")
+        } else {
+            value.to_owned()
+        }
+    }
 }
 
 fn display_log_path(path: &Path) -> String {
