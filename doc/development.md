@@ -78,22 +78,32 @@ cargo fmt
 ## Sandboxed Smoke Tests
 
 Use Docker for smoke tests that may execute a real package manager. The
-container is disposable, mounts the repository read-only, copies it into an
-isolated workspace, disables npm lifecycle scripts, and runs the package
-manager from a temporary project directory.
+container is disposable, disables npm lifecycle scripts, and runs the package
+manager from a temporary project directory. The sandbox image builds the local
+`packvet` binary into `/usr/local/bin/packvet`; later runs reuse Docker build
+cache unless source files changed.
+
+By default, the sandbox prints the exact prompt that would be sent to a local
+review provider and blocks before the real install command runs:
 
 ```bash
-scripts/sandbox-npm-install.sh left-pad
+scripts/sandbox-install.sh npm left-pad
+scripts/sandbox-install.sh pnpm left-pad
+scripts/sandbox-install.sh yarn left-pad
 ```
 
-To inspect the exact prompt that would be sent to a local review provider,
-print it through a fake in-container provider:
+To allow the real package manager install after packvet pauses, opt in
+explicitly:
 
 ```bash
-scripts/sandbox-npm-install.sh --print-prompt left-pad
+scripts/sandbox-install.sh --allow-install npm left-pad
 ```
 
-Prompt print mode blocks before the real install command runs.
+Force a clean sandbox image rebuild with:
+
+```bash
+scripts/sandbox-install.sh --rebuild npm left-pad
+```
 
 For direct local-provider runs, `PACKVET_PRINT_REVIEW_PROMPT=1` prints the
 review prompt to stderr before invoking the provider.
