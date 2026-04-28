@@ -58,7 +58,7 @@ Core behavior needs focused tests:
 - policy decision table
 - fail-to-ask scenarios
 - adapter registry lookup
-- command shim recursion protection
+- real command execution behavior
 
 Prompt text and user-facing verdict text are product behavior. Snapshot
 them when practical.
@@ -75,62 +75,10 @@ cargo clippy -- -D warnings
 cargo fmt
 ```
 
-## Smoke Tests
-
-For local smoke tests, run packvet in a temporary npm project with a local
-review provider:
-
-```bash
-scripts/smoke-local.sh
-```
-
-For Docker smoke tests, run packvet in a disposable container with a fake pass
-provider:
-
-```bash
-scripts/smoke-docker.sh
-```
-
-Both smoke scripts default to `is-number@7.0.0`, which is allowlisted for smoke
-testing after an `npm audit --omit=dev` check reported zero vulnerabilities.
-They disable npm lifecycle scripts and run `npm audit --omit=dev` after install.
-
-## Sandboxed Debug Tests
-
-Use Docker for smoke tests that may execute a real package manager. The
-container is disposable, disables npm lifecycle scripts, and runs the package
-manager from a temporary project directory. The sandbox image builds the local
-`packvet` binary into `/usr/local/bin/packvet`; later runs reuse Docker build
-cache unless source files changed.
-
-By default, the sandbox prints the exact prompt that would be sent to a local
-review provider and blocks before the real install command runs:
-
-```bash
-scripts/sandbox-install.sh npm is-number@7.0.0
-scripts/sandbox-install.sh pnpm is-number@7.0.0
-scripts/sandbox-install.sh yarn is-number@7.0.0
-```
-
-To allow the real package manager install after packvet pauses, opt in
-explicitly:
-
-```bash
-scripts/sandbox-install.sh --allow-install npm is-number@7.0.0
-```
-
-Force a clean sandbox image rebuild with:
-
-```bash
-scripts/sandbox-install.sh --rebuild npm is-number@7.0.0
-```
-
 For direct local-provider runs, `PACKVET_PRINT_REVIEW_PROMPT=1` prints the
 review prompt to stderr before invoking the provider. Provider reviews are
 logged by default under `~/.packvet/reviews/reviews.jsonl`; set
 `PACKVET_REVIEW_LOG_DIR` in tests to keep logs inside a temporary directory.
-
-This script is opt-in because it requires Docker and live network access.
 
 Before finishing implementation work, run at least:
 

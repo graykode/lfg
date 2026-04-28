@@ -1,9 +1,20 @@
 # packvet
 
-packvet is a local pre-install guard for package managers.
+packvet reviews package releases before you install them.
 
-It runs before package manager install commands, reviews risky new package
-releases, and only then lets the real package manager run.
+Run install commands through packvet, such as `packvet npm install left-pad`,
+or use `packvet review ...` when you only want the verdict. For guarded
+installs, packvet resolves the target release, reviews risky fresh releases,
+and then runs the real package manager, asks for confirmation, or blocks.
+
+## Works with
+
+packvet currently supports local review through:
+
+- Claude Code CLI (`claude`)
+- Codex CLI (`codex`)
+
+Direct API-key review providers are not wired yet.
 
 ## Install
 
@@ -28,25 +39,18 @@ Run packvet explicitly:
 
 ```bash
 packvet npm install left-pad
-packvet pip install -r requirements.txt
+packvet pip install requests
 packvet uv add requests
 packvet cargo add serde
 ```
 
-Install PATH shims so normal package manager commands pass through packvet first:
+Review a package manager install request without executing the real package
+manager:
 
 ```bash
-packvet shim install --dir ~/.local/bin npm
-packvet shim install --dir ~/.local/bin pnpm
-packvet shim install --dir ~/.local/bin yarn
-packvet shim install --dir ~/.local/bin pip
-packvet shim install --dir ~/.local/bin uv
-packvet shim install --dir ~/.local/bin cargo
-packvet shim install --dir ~/.local/bin gem
+packvet review npm install left-pad
+packvet review cargo add serde
 ```
-
-Make sure the shim directory appears before the real package managers on
-`PATH`.
 
 When a provider review runs, packvet writes the prompt, provider output,
 parsed verdict, reason, and evidence to `~/.packvet/reviews/reviews.jsonl`.
@@ -57,31 +61,6 @@ verdicts stop the install.
 Color is enabled automatically on interactive terminals. Set
 `PACKVET_COLOR=never` to disable it, `PACKVET_COLOR=always` to force it, or
 `NO_COLOR=1` to disable color for tools that honor that convention.
-
-## Smoke Tests
-
-Use the local smoke test to run packvet in a temporary npm project with the
-local review provider:
-
-```bash
-scripts/smoke-local.sh
-```
-
-Use the Docker smoke test to verify the same install flow in a disposable
-container with a fake pass provider:
-
-```bash
-scripts/smoke-docker.sh
-```
-
-Both scripts default to the allowlisted package `is-number@7.0.0`, install with
-npm lifecycle scripts disabled, and run `npm audit --omit=dev` after install.
-
-Use `PACKVET_BYPASS=1` only as an emergency bypass:
-
-```bash
-PACKVET_BYPASS=1 npm install left-pad
-```
 
 ## Policy
 
@@ -115,4 +94,4 @@ git push origin v0.1.0
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

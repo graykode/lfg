@@ -1,8 +1,8 @@
 # Goal
 
-packvet is a local pre-install guard for package managers. It stands in front
-of normal install commands, reviews risky new package releases, and only
-then allows the real package manager to run.
+packvet reviews package releases before you install them. The user runs
+install commands through packvet, packvet reviews risky new package releases,
+and only then allows the real package manager to run.
 
 ## Product Bet
 

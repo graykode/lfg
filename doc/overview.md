@@ -1,15 +1,17 @@
 # Overview
 
-packvet is a local pre-install guard for package managers.
+packvet reviews package releases before you install them.
 
-The user keeps typing normal install commands such as `npm i`, `pip
-install -r requirements.txt`, or `uv add`. packvet runs first, reviews risky
-new package releases, and only then lets the real package manager run.
+The user runs install commands through packvet, such as `packvet npm i`,
+`packvet pip install -r requirements.txt`, or `packvet uv add`. packvet
+reviews risky new package releases and only then lets the real package manager
+run. The `packvet review ...` command runs the same review path without
+executing the package manager.
 
 ## User Workflow
 
-1. The user runs a package install command.
-2. A command shim or wrapper invokes packvet before the real package manager.
+1. The user runs an install command through packvet.
+2. packvet identifies the target package manager and command.
 3. packvet parses the install request into one or more package targets.
 4. packvet resolves registry metadata for each target.
 5. packvet applies the review policy.
@@ -40,7 +42,7 @@ of silently passing.
 ## Architecture
 
 ```text
-Command Shim
+CLI Entrypoint
   -> Install Request Parser
   -> Manager Integration Adapter
   -> Ecosystem Release Resolver
@@ -60,8 +62,8 @@ LLM execution are separate concerns.
 - Manager integration adapters understand commands such as `npm install`
   or `pip install`.
 - Ecosystem release resolvers understand registries such as npm or PyPI.
-- LLM adapters execute providers such as local Claude CLI, local Codex CLI,
-  or API providers.
+- LLM adapters execute review providers. The current implementation supports
+  local Claude CLI and local Codex CLI.
 
 packvet has no hosted backend. Package diffs go from the user's machine to the
 provider selected by local configuration and policy.

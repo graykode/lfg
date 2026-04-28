@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::process::Command;
 
 pub(crate) fn run_packvet(args: &[&str]) -> std::process::Output {
@@ -100,25 +99,4 @@ pub(crate) fn run_packvet_with_rubygems_registry_now_and_env(
     }
 
     command.output().expect("run packvet binary")
-}
-
-pub(crate) fn run_program_with_registry_now_and_env(
-    program: &Path,
-    args: &[&str],
-    registry_base_url: &str,
-    now_unix_seconds: u64,
-    envs: &[(&str, String)],
-) -> std::process::Output {
-    let mut command = Command::new(program);
-    command
-        .args(args)
-        .env("PACKVET_NPM_REGISTRY_URL", registry_base_url)
-        .env("PACKVET_NOW_UNIX_SECONDS", now_unix_seconds.to_string())
-        .env("PACKVET_REVIEW_PROVIDER", "none");
-
-    for (key, value) in envs {
-        command.env(key, value);
-    }
-
-    command.output().expect("run packvet shim")
 }

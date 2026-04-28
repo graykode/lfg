@@ -1,7 +1,6 @@
 use std::fs;
-use std::os::unix::fs::symlink;
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) fn write_fake_npm_bin(dir: &Path) {
     write_fake_manager_bin(
@@ -84,13 +83,6 @@ fn write_fake_manager_bin(dir: &Path, manager: &str, args_env: &str, stdout: &st
     )
     .expect("write fake manager");
     mark_executable(&manager_path);
-}
-
-pub(crate) fn write_packvet_shim(dir: &Path, name: &str) -> PathBuf {
-    fs::create_dir_all(dir).expect("create shim bin dir");
-    let shim_path = dir.join(name);
-    symlink(env!("CARGO_BIN_EXE_packvet"), &shim_path).expect("create packvet shim symlink");
-    shim_path
 }
 
 pub(crate) fn write_fake_claude_bin(dir: &Path, provider_output: &str) {

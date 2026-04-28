@@ -163,23 +163,23 @@ mod tests {
     }
 
     #[test]
-    fn path_locator_skips_shim_and_uses_next_matching_program() {
+    fn path_locator_skips_configured_paths_and_uses_next_matching_program() {
         let temp_dir = temp_test_dir("packvet-command-locator");
-        let shim_dir = temp_dir.join("shim");
+        let skipped_dir = temp_dir.join("skipped");
         let real_dir = temp_dir.join("real");
-        fs::create_dir_all(&shim_dir).expect("create shim dir");
+        fs::create_dir_all(&skipped_dir).expect("create skipped dir");
         fs::create_dir_all(&real_dir).expect("create real dir");
 
         let packvet_path = temp_dir.join("packvet");
-        let shim_path = shim_dir.join("npm");
+        let skipped_path = skipped_dir.join("npm");
         let real_path = real_dir.join("npm");
         fs::write(&packvet_path, "").expect("write packvet placeholder");
-        symlink(&packvet_path, &shim_path).expect("create shim symlink");
+        symlink(&packvet_path, &skipped_path).expect("create skipped symlink");
         fs::write(&real_path, "").expect("write real npm placeholder");
 
         let locator = PathCommandLocator::new(
-            std::env::join_paths([&shim_dir, &real_dir]).expect("join path"),
-            vec![shim_path],
+            std::env::join_paths([&skipped_dir, &real_dir]).expect("join path"),
+            vec![skipped_path],
         );
 
         assert_eq!(locator.resolve("npm"), Some(real_path));

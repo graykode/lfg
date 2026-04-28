@@ -161,7 +161,7 @@ Rationale:
 
 External adapters describe the same logical contracts as built-in adapters.
 They do not own core install assessment, review policy, diff generation,
-provider preference, verdict parsing, command shim behavior, or real package
+provider preference, verdict parsing, CLI wrapper behavior, or real package
 manager execution.
 
 The process model is one request per process invocation:

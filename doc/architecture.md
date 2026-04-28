@@ -1,18 +1,8 @@
 # Architecture
 
-packvet is a local pre-install gate. It runs before the real package manager
-executes an install command.
-
-The primary integration path is command interception. The initial version
-can install shell aliases or functions such as `npm -> packvet npm` for
-convenience. The durable transparent guard is a PATH shim, because it works
-outside interactive shell alias expansion and is harder to bypass
-accidentally.
-
-In the strongest form, a shim named `npm`, `pip`, `uv`, or another manager
-name is placed before the real binary on `PATH`. The shim calls packvet, packvet
-reviews the requested install, and only then does packvet execute the real
-package manager.
+packvet is a local install-command reviewer. It runs when the user invokes a
+package manager command through packvet, such as `packvet npm install <pkg>`,
+or when the user asks for a review-only verdict with `packvet review ...`.
 
 Package-controlled lifecycle scripts such as `package.json` `preinstall`,
 `setup.py`, or `build.rs` are not trusted integration points. They are
@@ -21,7 +11,7 @@ review evidence.
 ## System Flow
 
 ```text
-Command Shim
+CLI Entrypoint
   -> Install Request Parser
   -> Manager Integration Adapter
   -> Ecosystem Release Resolver
@@ -89,32 +79,22 @@ Start in `core/install_assessment.rs` for the manager-neutral assessment flow.
 Look in `managers/` for package-manager CLI parsing, and in `ecosystems/`
 for registry-specific metadata resolution shared by managers.
 
-## Command Shim
+## CLI Entrypoint
 
-The command shim is the normal product entrypoint.
+The explicit CLI wrapper is the normal product entrypoint.
 
 Responsibilities:
 
-- identify the requested manager from `argv[0]` or explicit packvet arguments
+- identify the requested manager from explicit packvet arguments
 - pass the original arguments to the matching manager integration adapter
-- avoid recursion when finding the real manager binary
 - preserve stdin, stdout, stderr, environment, and exit behavior where safe
 - run the real package manager only after the install gate allows it
 - honor `PACKVET_BYPASS=1` as an emergency path that skips review and runs the
   real package manager directly
 
-Shell aliases or functions are acceptable as convenience setup because they
-are simple, reversible, and familiar. They are not a complete security
-boundary.
-
-PATH shim setup is explicit and reversible. `packvet shim install --dir <dir>
-npm` creates an `npm` shim in the chosen directory, and `packvet shim uninstall
---dir <dir> npm` removes only shims that point back to the current packvet
-executable.
-
-Native trusted hooks or package-manager plugins can be added when an
+Native trusted hooks or package-manager plugins can be added later when an
 ecosystem offers a hook that runs before package code. They are secondary
-integrations. PATH shims remain the portable stronger baseline.
+integrations, not the MVP integration path.
 
 ## Install Request Parser
 

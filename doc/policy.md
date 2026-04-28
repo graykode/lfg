@@ -93,6 +93,8 @@ Without an explicit provider override, packvet uses this default order:
 3. other local model adapters
 4. API provider adapters
 
+The current implementation only wires local Claude CLI and local Codex CLI.
+
 The current explicit provider override is `PACKVET_REVIEW_PROVIDER`.
 
 | Value | Behavior |
@@ -141,7 +143,8 @@ Prefer `20` over `1` when packvet can say the review did not complete safely.
 | `ask` | prompt the user | exit with code `20` |
 | `block` | stop without running the real package manager | exit with code `30` |
 
-Wrappers, shims, and hooks must still see the same verdict contract.
+The explicit install wrapper and review-only command must still see the same
+verdict contract.
 
 ## Provider Output Contract
 

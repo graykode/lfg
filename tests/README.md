@@ -1,13 +1,12 @@
 # Integration Test Layout
 
-Keep `tests/` for integration tests that execute the user-facing CLI or shim
-flow. Unit and component tests should live under `src/` next to the code they
-exercise.
+Keep `tests/` for integration tests that execute the user-facing CLI from the
+compiled binary. Unit and component tests should live under `src/` next to the
+code they exercise.
 
 ## Belongs Here
 
 - CLI behavior such as `packvet npm install ...`.
-- Shim behavior such as invoking packvet through an `npm` shim.
 - End-to-end manager execution after policy/provider pass decisions.
 - End-to-end fail-to-ask behavior when install review cannot proceed.
 

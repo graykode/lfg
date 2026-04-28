@@ -3,9 +3,8 @@
 Milestones are implementation checkpoints. Each one should leave the repo
 in a working, testable state.
 
-The product goal is transparent pre-install guarding through command
-shims. The early implementation can use explicit wrapper commands because
-they are easier to test and debug.
+The product goal is a local review gate that users invoke explicitly through
+packvet install-wrapper commands or review-only commands.
 
 ## Milestone 0: Core Contract
 
@@ -32,7 +31,7 @@ Exit criteria:
 ## Milestone 1: Explicit Wrapper Vertical Slice
 
 Goal: prove the full review loop with one manager and one local LLM
-adapter before installing command shims.
+adapter.
 
 Scope:
 
@@ -52,29 +51,25 @@ Exit criteria:
 - The npm adapter does not duplicate diff, policy, provider, or verdict
   logic.
 
-## Milestone 2: Command Shim Install
+## Milestone 2: Install Execution And Review-Only UX
 
-Goal: make normal user commands pass through packvet before the real package
-manager runs.
+Goal: make explicit packvet commands feel clear, observable, and safe.
 
 Scope:
 
-- Provide reversible shell aliases or functions as convenience setup.
-- Implement PATH shim support as the durable transparent guard.
-- Detect the manager from `argv[0]`.
-- Locate the real package manager binary without recursive shim calls.
-- Preserve original arguments, environment, stdin, stdout, and stderr
-  where safe.
-- Support `npm install` and `npm i` through the shim path.
+- Preserve original arguments, environment, stdin, stdout, and stderr where
+  safe.
+- Stream packvet-owned progress output so long review steps are visible.
+- Support npm `install` and `i` aliases through explicit packvet invocation.
+- Add review-only commands that run resolver, diff, and provider review without
+  executing the real package manager.
 - Provide a clear opt-out or bypass path for emergency use.
 
 Exit criteria:
 
-- Typing `npm i <package>` can invoke packvet first through the configured
-  interception path.
+- Typing `packvet npm i <package>` invokes the install gate.
+- Typing `packvet review npm install <package>` never executes npm.
 - The real npm binary only runs after pass or explicit user confirmation.
-- The docs distinguish convenience aliases/functions from PATH shims.
-- Recursion protection is tested.
 - Failure to locate the real package manager returns `ask` or a clear CLI
   misuse error, never silent pass.
 
@@ -127,10 +122,10 @@ Targets:
 
 | Manager | Ecosystem resolver | Primary integration |
 |---|---|---|
-| `pnpm` | npm registry | command shim |
-| `yarn` | npm registry | command shim |
-| `cargo` | crates.io | command shim |
-| `gem` | rubygems.org | command shim |
+| `pnpm` | npm registry | explicit wrapper |
+| `yarn` | npm registry | explicit wrapper |
+| `cargo` | crates.io | explicit wrapper |
+| `gem` | rubygems.org | explicit wrapper |
 
 Exit criteria:
 

@@ -5,7 +5,6 @@ pub mod ecosystems;
 pub mod evidence;
 pub mod managers;
 pub mod providers;
-pub mod shims;
 
 #[cfg(test)]
 mod builtins_tests;

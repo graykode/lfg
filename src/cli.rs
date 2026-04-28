@@ -17,9 +17,6 @@ use crate::core::{
 use crate::core::{ReleaseReviewer, ResolvedPackageReleases, SkipReason};
 use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
 use crate::providers::{ArchiveDiffReviewer, ProviderError, ReviewPrompt, ReviewProvider};
-use crate::shims::{
-    install_shim, parse_shim_command, uninstall_shim, ShimCommand, ShimCommandError, ShimSetupError,
-};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliResponse {
@@ -133,17 +130,6 @@ fn run_with_ask_confirmer(
     let program = args.next().unwrap_or_default();
     let invocation_program_path = PathBuf::from(&program);
 
-    if let Some(manager_id) = manager_id_from_program(&program) {
-        return run_manager(
-            manager_id,
-            args.collect(),
-            invocation_program_path,
-            confirmer,
-            reporter,
-            ManagerRunMode::InstallGuard,
-        );
-    }
-
     match args.next() {
         None => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
@@ -160,7 +146,6 @@ fn run_with_ask_confirmer(
             stdout: format!("packvet {}\n", env!("CARGO_PKG_VERSION")),
             stderr: String::new(),
         },
-        Some(argument) if argument == "shim" => run_shim_command(args.collect()),
         Some(argument) if argument == "review" => {
             run_review_command(args.collect(), invocation_program_path, reporter)
         }
@@ -173,15 +158,6 @@ fn run_with_ask_confirmer(
             ManagerRunMode::InstallGuard,
         ),
     }
-}
-
-fn manager_id_from_program(program: &str) -> Option<&str> {
-    let program_name = Path::new(program).file_name()?.to_str()?;
-    let registry = built_in_manager_adapters().ok()?;
-
-    registry.get(program_name).ok()?;
-
-    Some(program_name)
 }
 
 fn run_manager(
@@ -248,104 +224,6 @@ fn bypass_requested() -> bool {
         env::var("PACKVET_BYPASS").ok().as_deref(),
         Some("1" | "true" | "yes")
     )
-}
-
-fn run_shim_command(args: Vec<String>) -> CliResponse {
-    let command = match parse_shim_command(&args) {
-        Ok(command) => command,
-        Err(error) => return shim_command_error_response(error),
-    };
-
-    let manager_id = match &command {
-        ShimCommand::Install { manager_id, .. } | ShimCommand::Uninstall { manager_id, .. } => {
-            manager_id
-        }
-    };
-    let registry = match built_in_manager_adapters() {
-        Ok(registry) => registry,
-        Err(_) => return adapter_unavailable_response(manager_id),
-    };
-    if registry.get(manager_id).is_err() {
-        return unknown_argument_response(manager_id);
-    }
-
-    let packvet_executable = match env::current_exe() {
-        Ok(path) => path,
-        Err(error) => {
-            return CliResponse {
-                exit_code: Verdict::Ask.exit_code(),
-                stdout: String::new(),
-                stderr: format!("packvet: could not locate packvet executable: {error}\n"),
-            };
-        }
-    };
-
-    match command {
-        ShimCommand::Install { manager_id, dir } => {
-            match install_shim(&manager_id, &dir, &packvet_executable) {
-                Ok(path) => CliResponse {
-                    exit_code: 0,
-                    stdout: format!(
-                        "packvet: installed {manager_id} shim at {}\n",
-                        path.display()
-                    ),
-                    stderr: String::new(),
-                },
-                Err(error) => shim_setup_error_response(error),
-            }
-        }
-        ShimCommand::Uninstall { manager_id, dir } => {
-            match uninstall_shim(&manager_id, &dir, &packvet_executable) {
-                Ok(path) => CliResponse {
-                    exit_code: 0,
-                    stdout: format!(
-                        "packvet: removed {manager_id} shim from {}\n",
-                        path.display()
-                    ),
-                    stderr: String::new(),
-                },
-                Err(error) => shim_setup_error_response(error),
-            }
-        }
-    }
-}
-
-fn shim_command_error_response(error: ShimCommandError) -> CliResponse {
-    let message = match error {
-        ShimCommandError::MissingAction => "packvet: shim action is required\n".to_owned(),
-        ShimCommandError::MissingDir => "packvet: shim --dir is required\n".to_owned(),
-        ShimCommandError::MissingManager => "packvet: shim manager is required\n".to_owned(),
-        ShimCommandError::UnsupportedAction(action) => {
-            format!("packvet: unsupported shim action: {action}\n")
-        }
-        ShimCommandError::UnknownArgument(argument) => {
-            format!("packvet: unknown shim argument: {argument}\n")
-        }
-    };
-
-    CliResponse {
-        exit_code: 1,
-        stdout: String::new(),
-        stderr: message,
-    }
-}
-
-fn shim_setup_error_response(error: ShimSetupError) -> CliResponse {
-    let message = match error {
-        ShimSetupError::ExistingPath(path) => {
-            format!("packvet: shim target already exists: {}\n", path.display())
-        }
-        ShimSetupError::NotPackvetShim(path) => {
-            format!("packvet: not a packvet shim: {}\n", path.display())
-        }
-        ShimSetupError::Io(error) => format!("packvet: shim setup failed: {error}\n"),
-    };
-
-    CliResponse {
-        exit_code: 1,
-        stdout: String::new(),
-        stderr: message,
-    }
 }
 
 struct ProgressReviewProvider<'a, P> {
@@ -937,12 +815,10 @@ fn ask_message(manager_id: &str, operation: &str, outcomes: &[PackageOutcome]) -
 
 fn help_text() -> String {
     "\
-packvet is a local pre-install guard for package managers.
+packvet reviews package releases before you install them.
 
 Usage: packvet [OPTIONS] [MANAGER] [ARGS]
        packvet review <MANAGER> [ARGS]
-       packvet shim install --dir <DIR> <MANAGER>
-       packvet shim uninstall --dir <DIR> <MANAGER>
 
 Options:
   -h, --help       Print help
@@ -955,9 +831,8 @@ Examples:
   packvet npm install <package>
   packvet pnpm add <package>
   packvet yarn add <package>
-  packvet pip install -r requirements.txt
+  packvet pip install <package>
   packvet uv add <package>
-  packvet shim install --dir ~/.local/bin pnpm
 "
     .to_owned()
 }
@@ -991,18 +866,6 @@ mod tests {
         assert_eq!(response.exit_code, 1);
         assert!(response.stdout.is_empty());
         assert_eq!(response.stderr, "packvet: unknown argument: --bad\n");
-    }
-
-    #[test]
-    fn shim_invocation_uses_program_name_as_manager() {
-        let response = run(["/tmp/npm".to_owned(), "install".to_owned()]);
-
-        assert_eq!(response.exit_code, 1);
-        assert!(response.stdout.is_empty());
-        assert_eq!(
-            response.stderr,
-            "packvet: npm install needs at least one package\n"
-        );
     }
 
     #[test]
