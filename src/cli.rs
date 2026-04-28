@@ -8,7 +8,7 @@ use crate::builtins::{
     built_in_review_provider, AdapterConfig, PathProgramDetector, PolicyConfig,
 };
 use crate::core::Verdict;
-use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
+use crate::core::{aggregate_verdicts, has_provider_pass, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
 use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor};
 use crate::core::{
@@ -314,6 +314,18 @@ fn evaluate_manager_request(
     let verdict = aggregate_verdicts(&outcomes);
     if verdict == Verdict::Pass {
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
+        if has_provider_pass(&outcomes) {
+            let operation = operation_label(request.operation);
+            let pass_message = format!(
+                "packvet: provider passed {} {}. install is paused.\n",
+                adapter.id(),
+                operation
+            );
+            return confirm_install(adapter.id(), operation, pass_message, confirmer, || {
+                execute_manager_request(adapter, &request, &executor)
+            });
+        }
+
         return execute_manager_request(adapter, &request, &executor);
     }
 
@@ -321,7 +333,7 @@ fn evaluate_manager_request(
         let operation = operation_label(request.operation);
         let ask_message = ask_message(adapter.id(), operation, &outcomes);
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
-        return confirm_ask_or_pause(adapter.id(), operation, ask_message, confirmer, || {
+        return confirm_install(adapter.id(), operation, ask_message, confirmer, || {
             execute_manager_request(adapter, &request, &executor)
         });
     }
@@ -335,18 +347,17 @@ fn evaluate_manager_request(
     }
 }
 
-fn confirm_ask_or_pause<F>(
+fn confirm_install<F>(
     manager_id: &str,
     operation: &str,
-    ask_message: String,
+    message: String,
     confirmer: &mut dyn AskConfirmer,
     execute: F,
 ) -> CliResponse
 where
     F: FnOnce() -> CliResponse,
 {
-    let prompt =
-        format!("{ask_message}packvet: continue with {manager_id} {operation} anyway? [y/N] ");
+    let prompt = format!("{message}packvet: continue with {manager_id} {operation}? [y/N] ");
 
     match confirmer.confirm(&prompt) {
         AskConfirmation::Accepted => execute(),
@@ -358,7 +369,7 @@ where
         AskConfirmation::Unavailable => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
-            stderr: ask_message,
+            stderr: message,
         },
     }
 }
@@ -716,7 +727,7 @@ mod tests {
             prompts: Vec::new(),
         };
 
-        let response = confirm_ask_or_pause(
+        let response = confirm_install(
             "npm",
             "install",
             "packvet: review could not complete safely; install is paused.\n".to_owned(),
@@ -733,7 +744,7 @@ mod tests {
         assert_eq!(
             confirmer.prompts,
             vec![
-                "packvet: review could not complete safely; install is paused.\npackvet: continue with npm install anyway? [y/N] "
+                "packvet: review could not complete safely; install is paused.\npackvet: continue with npm install? [y/N] "
             ]
         );
     }
@@ -745,7 +756,7 @@ mod tests {
             prompts: Vec::new(),
         };
 
-        let response = confirm_ask_or_pause(
+        let response = confirm_install(
             "npm",
             "install",
             "packvet: review could not complete safely; install is paused.\n".to_owned(),
@@ -769,7 +780,7 @@ mod tests {
             prompts: Vec::new(),
         };
 
-        let response = confirm_ask_or_pause(
+        let response = confirm_install(
             "npm",
             "install",
             "packvet: review could not complete safely; install is paused.\n".to_owned(),

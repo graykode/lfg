@@ -3,7 +3,8 @@ use crate::core::{
 };
 use crate::evidence::{ArchiveDiffBuilder, ArchiveFetcher, DiffEngine};
 use crate::providers::{
-    parse_provider_output, DiffReviewPromptBuilder, PromptBuilder, ReviewPrompt,
+    parse_provider_output, write_provider_review_log, DiffReviewPromptBuilder, PromptBuilder,
+    ReviewPrompt,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +88,13 @@ where
                 match self.provider.review(&prompt) {
                     Ok(output) => {
                         let review = parse_provider_output(&output);
+                        let _ = write_provider_review_log(
+                            releases,
+                            self.provider.id(),
+                            &prompt,
+                            &output,
+                            &review,
+                        );
                         PackageOutcome::ProviderVerdict(review.verdict)
                     }
                     Err(ProviderError::Timeout) => {

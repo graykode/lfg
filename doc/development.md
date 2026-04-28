@@ -106,7 +106,9 @@ scripts/sandbox-install.sh --rebuild npm left-pad
 ```
 
 For direct local-provider runs, `PACKVET_PRINT_REVIEW_PROMPT=1` prints the
-review prompt to stderr before invoking the provider.
+review prompt to stderr before invoking the provider. Provider reviews are
+logged by default under `~/.packvet/reviews/reviews.jsonl`; set
+`PACKVET_REVIEW_LOG_DIR` in tests to keep logs inside a temporary directory.
 
 This script is opt-in because it requires Docker and live network access.
 

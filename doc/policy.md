@@ -108,6 +108,11 @@ the user's machine to the selected provider.
 Local provider commands have a 60 second execution timeout. A timeout maps to
 `ask` and must not run the real package manager silently.
 
+When a provider review runs, packvet writes an audit record to
+`~/.packvet/reviews/reviews.jsonl` by default. The record includes the prompt,
+raw provider output, parsed verdict, reason, and evidence. The environment
+variable `PACKVET_REVIEW_LOG_DIR` may redirect the log directory.
+
 ## Verdict Exit Codes
 
 | Exit code | Meaning |
@@ -116,6 +121,10 @@ Local provider commands have a 60 second execution timeout. A timeout maps to
 | `20` | `ask`: user confirmation is required. |
 | `30` | `block`: install must not proceed. |
 | `1` | CLI misuse or internal bug before a safe verdict exists. |
+
+A provider `pass` verdict still asks for local confirmation before executing
+the real package manager. Policy skips for old releases may proceed without
+that prompt because no provider review was required.
 
 Prefer `20` over `1` when packvet can say the review did not complete safely.
 

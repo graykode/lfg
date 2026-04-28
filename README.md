@@ -48,6 +48,11 @@ packvet shim install --dir ~/.local/bin gem
 Make sure the shim directory appears before the real package managers on
 `PATH`.
 
+When a provider review runs, packvet writes the prompt, provider output,
+parsed verdict, reason, and evidence to `~/.packvet/reviews/reviews.jsonl`.
+Provider `pass` verdicts still require a local `y/N` confirmation before the
+real package manager runs.
+
 Use `PACKVET_BYPASS=1` only as an emergency bypass:
 
 ```bash

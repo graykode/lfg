@@ -152,12 +152,13 @@ fn explicit_recent_gem_install_fetches_metadata_and_pauses_for_diff_review() {
 }
 
 #[test]
-fn explicit_recent_npm_install_executes_real_npm_after_provider_pass() {
+fn explicit_recent_npm_install_logs_review_and_asks_before_provider_pass_execution() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
     let temp_dir = temp_test_dir("packvet-fake-provider-pass");
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     let fake_prompt_path = temp_dir.join("provider-prompt.txt");
+    let review_log_dir = temp_dir.join("reviews");
     write_fake_npm_bin(&fake_bin_dir);
     write_fake_claude_bin(
         &fake_bin_dir,
@@ -179,27 +180,32 @@ fn explicit_recent_npm_install_executes_real_npm_after_provider_pass() {
                 "PACKVET_FAKE_PROVIDER_PROMPT",
                 fake_prompt_path.to_string_lossy().into_owned(),
             ),
+            (
+                "PACKVET_REVIEW_LOG_DIR",
+                review_log_dir.to_string_lossy().into_owned(),
+            ),
         ],
     );
 
-    assert_eq!(output.status.code(), Some(0));
-    assert_eq!(
-        String::from_utf8(output.stdout).expect("stdout is utf-8"),
-        "fake npm stdout\n"
-    );
+    assert_eq!(output.status.code(), Some(20));
+    assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake npm stderr\n"
+        "packvet: provider passed npm install. install is paused.\n"
     );
-    assert_eq!(
-        fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
-        "install\nrecent-package\n"
-    );
+    assert!(!fake_args_path.exists());
     let prompt = fs::read_to_string(&fake_prompt_path).expect("provider prompt is captured");
     assert!(prompt.contains("package: recent-package"));
     assert!(prompt.contains("previous version: 1.0.0"));
     assert!(prompt.contains("target version: 1.1.0"));
     assert!(prompt.contains("+module.exports = 2;"));
+    let review_log =
+        fs::read_to_string(review_log_dir.join("reviews.jsonl")).expect("review log is written");
+    assert!(review_log.contains("\"package\":\"recent-package\""));
+    assert!(review_log.contains("\"provider_id\":\"claude-cli\""));
+    assert!(review_log.contains("\"provider_output\":\"verdict: pass"));
+    assert!(review_log.contains("\"verdict\":\"pass\""));
+    assert!(review_log.contains("\"prompt\":\"You are reviewing a package source diff"));
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
@@ -214,6 +220,7 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     let fake_prompt_path = temp_dir.join("provider-prompt.txt");
+    let review_log_dir = temp_dir.join("reviews");
     write_fake_npm_bin(&fake_bin_dir);
     write_fake_claude_bin(
         &fake_bin_dir,
@@ -234,6 +241,10 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
             (
                 "PACKVET_FAKE_PROVIDER_PROMPT",
                 fake_prompt_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "PACKVET_REVIEW_LOG_DIR",
+                review_log_dir.to_string_lossy().into_owned(),
             ),
         ],
     );
@@ -262,6 +273,7 @@ fn explicit_recent_npm_install_can_print_review_prompt_for_debugging() {
     let fake_bin_dir = temp_dir.join("bin");
     let fake_args_path = temp_dir.join("npm-args.txt");
     let fake_prompt_path = temp_dir.join("provider-prompt.txt");
+    let review_log_dir = temp_dir.join("reviews");
     write_fake_npm_bin(&fake_bin_dir);
     write_fake_claude_bin(
         &fake_bin_dir,
@@ -283,6 +295,10 @@ fn explicit_recent_npm_install_can_print_review_prompt_for_debugging() {
             (
                 "PACKVET_FAKE_PROVIDER_PROMPT",
                 fake_prompt_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "PACKVET_REVIEW_LOG_DIR",
+                review_log_dir.to_string_lossy().into_owned(),
             ),
         ],
     );
