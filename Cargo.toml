@@ -1,8 +1,8 @@
 [package]
 name = "packvet"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
-description = "Local pre-install guard for package manager installs"
+description = "Local pre-install guard that reviews package release diffs before installs"
 license = "MIT"
 repository = "https://github.com/graykode/packvet"
 homepage = "https://github.com/graykode/packvet"

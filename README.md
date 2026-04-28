@@ -233,8 +233,8 @@ Before pushing a release tag, configure these repository secrets:
 Then tag a version that matches `Cargo.toml`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.0.1
+git push origin v0.0.1
 ```
 
 ## License
