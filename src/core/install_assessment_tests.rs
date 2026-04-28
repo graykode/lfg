@@ -60,9 +60,9 @@ struct StaticReviewer {
 
 impl ReleaseReviewer for StaticReviewer {
     fn review(&self, releases: &ResolvedPackageReleases) -> PackageOutcome {
-        *self
-            .results
+        self.results
             .get(&releases.package_name)
+            .cloned()
             .expect("test package should be configured")
     }
 }

@@ -122,9 +122,10 @@ variable `PACKVET_REVIEW_LOG_DIR` may redirect the log directory.
 | `30` | `block`: install must not proceed. |
 | `1` | CLI misuse or internal bug before a safe verdict exists. |
 
-A provider `pass` verdict allows the real package manager to run after the
-review record is logged. `ask` remains the confirmation path for unavailable,
-timed-out, malformed, or uncertain reviews.
+A provider `pass` verdict prints a short summary with the package version,
+provider reason, and review log path, then allows the real package manager to
+run after the review record is logged. `ask` remains the confirmation path for
+unavailable, timed-out, malformed, or uncertain reviews.
 
 Prefer `20` over `1` when packvet can say the review did not complete safely.
 

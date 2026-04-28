@@ -15,11 +15,12 @@ pub fn write_provider_review_log(
     prompt: &ReviewPrompt,
     provider_output: &str,
     review: &ProviderReview,
-) -> Result<(), std::io::Error> {
+) -> Result<Option<PathBuf>, std::io::Error> {
     let Some(log_dir) = review_log_dir() else {
-        return Ok(());
+        return Ok(None);
     };
     fs::create_dir_all(&log_dir)?;
+    let log_path = log_dir.join("reviews.jsonl");
 
     let record = json!({
         "timestamp_unix_seconds": current_unix_seconds(),
@@ -50,8 +51,10 @@ pub fn write_provider_review_log(
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(log_dir.join("reviews.jsonl"))?;
-    writeln!(file, "{record}")
+        .open(&log_path)?;
+    writeln!(file, "{record}")?;
+
+    Ok(Some(log_path))
 }
 
 fn review_log_dir() -> Option<PathBuf> {

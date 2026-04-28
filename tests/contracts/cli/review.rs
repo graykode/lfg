@@ -194,7 +194,10 @@ fn explicit_recent_npm_install_logs_review_and_executes_real_npm_after_provider_
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake npm stderr\n"
+        format!(
+            "packvet: review passed for recent-package 1.1.0\npackvet: reason: fixture allowed\npackvet: review log: {}\nfake npm stderr\n",
+            review_log_dir.join("reviews.jsonl").display()
+        )
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),

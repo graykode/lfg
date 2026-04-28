@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 use crate::core::{
-    ArchiveRef, PackageOutcome, ReleaseReviewer, ResolvedPackageRelease, ResolvedPackageReleases,
-    ReviewUnavailableReason, Verdict,
+    ArchiveRef, PackageOutcome, ProviderReviewOutcome, ReleaseReviewer, ResolvedPackageRelease,
+    ResolvedPackageReleases, ReviewUnavailableReason, Verdict,
 };
 use crate::evidence::{ArchiveFetchError, ArchiveFetcher, UnifiedDiffEngine};
 use crate::providers::{ArchiveDiffReviewer, ProviderError, ReviewPrompt, ReviewProvider};
@@ -136,7 +136,13 @@ fn successful_archive_diff_returns_provider_verdict() {
 
     assert_eq!(
         reviewer.review(&releases()),
-        PackageOutcome::ProviderVerdict(Verdict::Block)
+        PackageOutcome::ProviderReview(ProviderReviewOutcome {
+            package_name: "demo".to_owned(),
+            version: "1.1.0".to_owned(),
+            verdict: Verdict::Block,
+            reason: Some("added risky code".to_owned()),
+            log_path: None,
+        })
     );
 }
 

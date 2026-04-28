@@ -1,5 +1,6 @@
 use crate::core::{
-    PackageOutcome, ReleaseReviewer, ResolvedPackageReleases, ReviewUnavailableReason,
+    PackageOutcome, ProviderReviewOutcome, ReleaseReviewer, ResolvedPackageReleases,
+    ReviewUnavailableReason,
 };
 use crate::evidence::{ArchiveDiffBuilder, ArchiveFetcher, DiffEngine};
 use crate::providers::{
@@ -88,14 +89,22 @@ where
                 match self.provider.review(&prompt) {
                     Ok(output) => {
                         let review = parse_provider_output(&output);
-                        let _ = write_provider_review_log(
+                        let log_path = write_provider_review_log(
                             releases,
                             self.provider.id(),
                             &prompt,
                             &output,
                             &review,
-                        );
-                        PackageOutcome::ProviderVerdict(review.verdict)
+                        )
+                        .ok()
+                        .flatten();
+                        PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                            package_name: releases.package_name.clone(),
+                            version: releases.target.version.clone(),
+                            verdict: review.verdict,
+                            reason: review.reason,
+                            log_path,
+                        })
                     }
                     Err(ProviderError::Timeout) => {
                         PackageOutcome::ReviewUnavailable(ReviewUnavailableReason::ProviderTimeout)

@@ -1,5 +1,6 @@
 use crate::core::Verdict;
 use crate::core::{AskReason, ReviewDecision, SkipReason};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReviewUnavailableReason {
@@ -10,12 +11,22 @@ pub enum ReviewUnavailableReason {
     MalformedProviderOutput,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderReviewOutcome {
+    pub package_name: String,
+    pub version: String,
+    pub verdict: Verdict,
+    pub reason: Option<String>,
+    pub log_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageOutcome {
     Skipped(SkipReason),
     PolicyAsk(AskReason),
     ReviewUnavailable(ReviewUnavailableReason),
     ProviderVerdict(Verdict),
+    ProviderReview(ProviderReviewOutcome),
 }
 
 impl PackageOutcome {
@@ -34,10 +45,25 @@ pub fn aggregate_verdicts(outcomes: &[PackageOutcome]) -> Verdict {
     for outcome in outcomes {
         match outcome {
             PackageOutcome::ProviderVerdict(Verdict::Block) => return Verdict::Block,
+            PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                verdict: Verdict::Block,
+                ..
+            }) => {
+                return Verdict::Block;
+            }
             PackageOutcome::ProviderVerdict(Verdict::Ask)
+            | PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                verdict: Verdict::Ask,
+                ..
+            })
             | PackageOutcome::PolicyAsk(_)
             | PackageOutcome::ReviewUnavailable(_) => has_ask = true,
-            PackageOutcome::ProviderVerdict(Verdict::Pass) | PackageOutcome::Skipped(_) => {}
+            PackageOutcome::ProviderVerdict(Verdict::Pass)
+            | PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                verdict: Verdict::Pass,
+                ..
+            })
+            | PackageOutcome::Skipped(_) => {}
         }
     }
 
@@ -96,6 +122,20 @@ mod tests {
     }
 
     #[test]
+    fn provider_review_ask_returns_ask() {
+        let verdict =
+            aggregate_verdicts(&[PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                package_name: "demo".to_owned(),
+                version: "1.0.0".to_owned(),
+                verdict: Verdict::Ask,
+                reason: Some("uncertain".to_owned()),
+                log_path: None,
+            })]);
+
+        assert_eq!(verdict, Verdict::Ask);
+    }
+
+    #[test]
     fn diff_failure_returns_ask() {
         let verdict = aggregate_verdicts(&[PackageOutcome::ReviewUnavailable(
             ReviewUnavailableReason::DiffFailure,
@@ -107,6 +147,20 @@ mod tests {
     #[test]
     fn provider_block_blocks_install() {
         let verdict = aggregate_verdicts(&[PackageOutcome::ProviderVerdict(Verdict::Block)]);
+
+        assert_eq!(verdict, Verdict::Block);
+    }
+
+    #[test]
+    fn provider_review_block_blocks_install() {
+        let verdict =
+            aggregate_verdicts(&[PackageOutcome::ProviderReview(ProviderReviewOutcome {
+                package_name: "demo".to_owned(),
+                version: "1.0.0".to_owned(),
+                verdict: Verdict::Block,
+                reason: Some("risky".to_owned()),
+                log_path: None,
+            })]);
 
         assert_eq!(verdict, Verdict::Block);
     }

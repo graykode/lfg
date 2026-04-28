@@ -314,7 +314,9 @@ fn evaluate_manager_request(
     let verdict = aggregate_verdicts(&outcomes);
     if verdict == Verdict::Pass {
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
-        return execute_manager_request(adapter, &request, &executor);
+        let mut response = execute_manager_request(adapter, &request, &executor);
+        response.stderr = format!("{}{}", provider_pass_messages(&outcomes), response.stderr);
+        return response;
     }
 
     if verdict == Verdict::Ask {
@@ -370,6 +372,52 @@ fn execute_manager_request(
     let command = adapter.real_command(request);
 
     execute_real_command(adapter.id(), command, executor)
+}
+
+fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
+    let mut message = String::new();
+
+    for outcome in outcomes {
+        let PackageOutcome::ProviderReview(review) = outcome else {
+            continue;
+        };
+
+        if review.verdict != Verdict::Pass {
+            continue;
+        }
+
+        let reason = review
+            .reason
+            .as_deref()
+            .unwrap_or("provider returned pass without a reason");
+        let log_path = review
+            .log_path
+            .as_deref()
+            .map(display_log_path)
+            .unwrap_or_else(|| "unavailable".to_owned());
+
+        message.push_str(&format!(
+            "packvet: review passed for {} {}\npackvet: reason: {}\npackvet: review log: {}\n",
+            review.package_name, review.version, reason, log_path
+        ));
+    }
+
+    message
+}
+
+fn display_log_path(path: &Path) -> String {
+    if let Some(home) = env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        if let Ok(relative) = path.strip_prefix(&home) {
+            if relative.as_os_str().is_empty() {
+                return "~".to_owned();
+            }
+
+            return format!("~/{}", relative.display());
+        }
+    }
+
+    path.display().to_string()
 }
 
 fn execute_manager_args(
