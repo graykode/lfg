@@ -1,4 +1,5 @@
 use crate::core::ManagerIntegrationAdapter;
+use crate::managers::bun::BunManagerAdapter;
 use crate::managers::cargo::CargoManagerAdapter;
 use crate::managers::gem::GemManagerAdapter;
 use crate::managers::npm::NpmManagerAdapter;
@@ -18,6 +19,7 @@ macro_rules! manager_adapter_catalog {
 }
 
 manager_adapter_catalog![
+    BunManagerAdapter,
     CargoManagerAdapter,
     GemManagerAdapter,
     NpmManagerAdapter,

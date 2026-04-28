@@ -6,8 +6,21 @@ fn built_in_manager_registry_contains_manager_adapters() {
 
     assert_eq!(
         registry.available_ids(),
-        vec!["cargo", "gem", "npm", "pip", "pnpm", "uv", "yarn"]
+        vec!["bun", "cargo", "gem", "npm", "pip", "pnpm", "uv", "yarn"]
     );
+
+    let adapter = registry.get("bun").expect("bun manager adapter");
+    assert_eq!(adapter.id(), "bun");
+    assert_eq!(adapter.release_resolver_id(), "npm-registry");
+    assert_eq!(
+        adapter.release_decision_evaluator_id(),
+        "npm-release-policy"
+    );
+
+    let request = adapter
+        .parse_install(&["add".to_owned(), "left-pad".to_owned()])
+        .expect("parse bun add");
+    assert_eq!(request.targets[0].spec, "left-pad");
 
     let adapter = registry.get("cargo").expect("cargo manager adapter");
     assert_eq!(adapter.id(), "cargo");

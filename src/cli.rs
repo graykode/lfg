@@ -648,6 +648,20 @@ fn manager_parse_error_response(manager_id: &str, error: ManagerAdapterError) ->
             stdout: String::new(),
             stderr: format!("packvet: {manager_id} requirements file path is required\n"),
         },
+        ManagerAdapterError::InvalidManifest(path) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "packvet: {manager_id} package manifest is invalid: {path}; install is paused.\n"
+            ),
+        },
+        ManagerAdapterError::ManifestUnavailable(path) => CliResponse {
+            exit_code: Verdict::Ask.exit_code(),
+            stdout: String::new(),
+            stderr: format!(
+                "packvet: {manager_id} package manifest is unavailable: {path}; install is paused.\n"
+            ),
+        },
         ManagerAdapterError::RequirementsFileUnavailable(path) => CliResponse {
             exit_code: Verdict::Ask.exit_code(),
             stdout: String::new(),
@@ -826,6 +840,7 @@ Options:
 
 Examples:
   packvet review npm install <package>
+  packvet bun add <package>
   packvet cargo add <crate>
   packvet gem install <gem>
   packvet npm install <package>

@@ -26,6 +26,22 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
 }
 
 #[test]
+fn explicit_recent_bun_add_fetches_metadata_and_pauses_for_diff_review() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+
+    let output = run_packvet_with_registry_and_now(
+        &["bun", "add", "recent-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+    );
+
+    assert_recent_review_pause(output, "bun", "add", "recent-package");
+
+    let requests = server.join().expect("server thread completes");
+    assert_recent_npm_archive_requests(&requests);
+}
+
+#[test]
 fn explicit_recent_pnpm_add_fetches_metadata_and_pauses_for_diff_review() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
 

@@ -1,7 +1,9 @@
 pub mod builtins;
+pub mod bun;
 pub mod cargo;
 pub mod gem;
 pub mod npm;
+pub mod package_json;
 pub mod pip;
 pub mod pnpm;
 pub mod uv;

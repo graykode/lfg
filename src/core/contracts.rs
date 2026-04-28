@@ -13,6 +13,8 @@ pub enum ManagerAdapterError {
     MissingCommand,
     MissingPackage,
     MissingRequirementsFile,
+    InvalidManifest(String),
+    ManifestUnavailable(String),
     RequirementsFileUnavailable(String),
     UnsupportedManagerOption(String),
     UnsupportedRequirement(String),

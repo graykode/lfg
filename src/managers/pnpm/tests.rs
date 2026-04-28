@@ -58,11 +58,19 @@ fn rejects_pnpm_add_without_package() {
 }
 
 #[test]
-fn rejects_unsupported_pnpm_command() {
+fn reports_unavailable_package_json_for_pnpm_install_without_package() {
     assert_eq!(
         PnpmManagerAdapter.parse_install(&args(&["install"])),
-        Err(ManagerAdapterError::UnsupportedCommand(
-            "install".to_owned()
+        Err(ManagerAdapterError::ManifestUnavailable(
+            "package.json".to_owned()
         ))
+    );
+}
+
+#[test]
+fn rejects_unsupported_pnpm_command() {
+    assert_eq!(
+        PnpmManagerAdapter.parse_install(&args(&["run"])),
+        Err(ManagerAdapterError::UnsupportedCommand("run".to_owned()))
     );
 }

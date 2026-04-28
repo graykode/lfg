@@ -12,6 +12,16 @@ pub(crate) fn write_fake_npm_bin(dir: &Path) {
     );
 }
 
+pub(crate) fn write_fake_bun_bin(dir: &Path) {
+    write_fake_manager_bin(
+        dir,
+        "bun",
+        "PACKVET_FAKE_BUN_ARGS",
+        "fake bun stdout",
+        "fake bun stderr",
+    );
+}
+
 pub(crate) fn write_fake_cargo_bin(dir: &Path) {
     write_fake_manager_bin(
         dir,

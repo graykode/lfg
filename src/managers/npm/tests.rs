@@ -67,10 +67,12 @@ fn asks_on_resolution_affecting_npm_option() {
 }
 
 #[test]
-fn rejects_npm_install_without_package() {
+fn reports_unavailable_package_json_for_npm_install_without_package() {
     assert_eq!(
         NpmManagerAdapter.parse_install(&args(&["install"])),
-        Err(ManagerAdapterError::MissingPackage)
+        Err(ManagerAdapterError::ManifestUnavailable(
+            "package.json".to_owned()
+        ))
     );
 }
 

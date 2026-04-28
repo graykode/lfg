@@ -3,11 +3,11 @@ use crate::core::{ManagerAdapterError, ManagerIntegrationAdapter};
 use crate::managers::package_json::package_json_install_targets;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NpmManagerAdapter;
+pub struct BunManagerAdapter;
 
-impl ManagerIntegrationAdapter for NpmManagerAdapter {
+impl ManagerIntegrationAdapter for BunManagerAdapter {
     fn id(&self) -> &'static str {
-        "npm"
+        "bun"
     }
 
     fn release_resolver_id(&self) -> &'static str {
@@ -19,30 +19,30 @@ impl ManagerIntegrationAdapter for NpmManagerAdapter {
     }
 
     fn parse_install(&self, args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
-        parse_npm_install(args)
+        parse_bun_install(args)
     }
 
     fn real_command(&self, request: &InstallRequest) -> RealCommand {
         RealCommand {
-            program: "npm".to_owned(),
+            program: "bun".to_owned(),
             args: request.manager_args.clone(),
         }
     }
 }
 
-fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
+fn parse_bun_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterError> {
     let Some(command) = args.first() else {
         return Err(ManagerAdapterError::MissingCommand);
     };
 
-    if command != "install" && command != "i" {
+    if command != "add" && command != "install" && command != "i" {
         return Err(ManagerAdapterError::UnsupportedCommand(command.to_owned()));
     }
 
     let mut targets = Vec::new();
     for arg in args.iter().skip(1) {
         if arg.starts_with('-') {
-            if is_allowed_npm_install_option(arg) {
+            if is_allowed_bun_install_option(arg) {
                 continue;
             }
 
@@ -56,28 +56,38 @@ fn parse_npm_install(args: &[String]) -> Result<InstallRequest, ManagerAdapterEr
         });
     }
 
+    let operation = if command == "add" {
+        InstallOperation::Add
+    } else {
+        InstallOperation::Install
+    };
+
+    if targets.is_empty() && operation == InstallOperation::Add {
+        return Err(ManagerAdapterError::MissingPackage);
+    }
     if targets.is_empty() {
         targets = package_json_install_targets()?;
     }
 
     Ok(InstallRequest {
-        manager: PackageManager::Npm,
-        operation: InstallOperation::Install,
+        manager: PackageManager::Bun,
+        operation,
         targets,
         manager_args: args.to_vec(),
     })
 }
 
-fn is_allowed_npm_install_option(arg: &str) -> bool {
+fn is_allowed_bun_install_option(arg: &str) -> bool {
     matches!(
         arg,
-        "-D" | "--save-dev"
-            | "-O"
-            | "--save-optional"
-            | "-P"
-            | "--save-prod"
-            | "--save-peer"
+        "-d" | "--dev"
+            | "--optional"
+            | "--peer"
+            | "--exact"
             | "-E"
-            | "--save-exact"
+            | "--production"
+            | "--frozen-lockfile"
+            | "--ignore-scripts"
+            | "--no-save"
     )
 }

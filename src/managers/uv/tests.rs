@@ -3,9 +3,21 @@ use crate::core::{
     ManagerIntegrationAdapter, PackageManager,
 };
 use crate::managers::uv::UvManagerAdapter;
+use std::fs;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
+}
+
+fn temp_requirements_file(content: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock after epoch")
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("packvet-uv-requirements-{nanos}.txt"));
+    fs::write(&path, content).expect("write requirements file");
+    path.to_string_lossy().into_owned()
 }
 
 #[test]
@@ -67,6 +79,42 @@ fn asks_on_resolution_affecting_uv_option() {
 }
 
 #[test]
+fn parses_uv_pip_install_requirements_file() {
+    let requirements_path = temp_requirements_file(
+        "\
+# comment
+requests==2.32.3
+
+urllib3
+",
+    );
+
+    let request = UvManagerAdapter
+        .parse_install(&args(&["pip", "install", "-r", &requirements_path]))
+        .expect("uv pip install -r should parse");
+
+    assert_eq!(request.manager, PackageManager::Uv);
+    assert_eq!(request.operation, InstallOperation::Install);
+    assert_eq!(
+        request.targets,
+        vec![
+            InstallTarget {
+                spec: "requests==2.32.3".to_owned()
+            },
+            InstallTarget {
+                spec: "urllib3".to_owned()
+            },
+        ]
+    );
+    assert_eq!(
+        request.manager_args,
+        args(&["pip", "install", "-r", &requirements_path])
+    );
+
+    fs::remove_file(requirements_path).expect("remove requirements file");
+}
+
+#[test]
 fn rejects_uv_add_without_package() {
     assert_eq!(
         UvManagerAdapter.parse_install(&args(&["add"])),
@@ -77,7 +125,7 @@ fn rejects_uv_add_without_package() {
 #[test]
 fn rejects_unsupported_uv_command() {
     assert_eq!(
-        UvManagerAdapter.parse_install(&args(&["pip", "install", "requests"])),
-        Err(ManagerAdapterError::UnsupportedCommand("pip".to_owned()))
+        UvManagerAdapter.parse_install(&args(&["sync"])),
+        Err(ManagerAdapterError::UnsupportedCommand("sync".to_owned()))
     );
 }

@@ -1,5 +1,6 @@
 use crate::core::{InstallOperation, InstallRequest, InstallTarget, PackageManager, RealCommand};
 use crate::core::{ManagerAdapterError, ManagerIntegrationAdapter};
+use crate::managers::package_json::package_json_install_targets;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PnpmManagerAdapter;
@@ -34,7 +35,7 @@ fn parse_pnpm_add(args: &[String]) -> Result<InstallRequest, ManagerAdapterError
         return Err(ManagerAdapterError::MissingCommand);
     };
 
-    if command != "add" {
+    if command != "add" && command != "install" && command != "i" {
         return Err(ManagerAdapterError::UnsupportedCommand(command.to_owned()));
     }
 
@@ -55,13 +56,22 @@ fn parse_pnpm_add(args: &[String]) -> Result<InstallRequest, ManagerAdapterError
         });
     }
 
-    if targets.is_empty() {
+    let operation = if command == "add" {
+        InstallOperation::Add
+    } else {
+        InstallOperation::Install
+    };
+
+    if targets.is_empty() && operation == InstallOperation::Add {
         return Err(ManagerAdapterError::MissingPackage);
+    }
+    if targets.is_empty() {
+        targets = package_json_install_targets()?;
     }
 
     Ok(InstallRequest {
         manager: PackageManager::Pnpm,
-        operation: InstallOperation::Add,
+        operation,
         targets,
         manager_args: args.to_vec(),
     })

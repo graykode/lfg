@@ -58,11 +58,19 @@ fn rejects_yarn_add_without_package() {
 }
 
 #[test]
-fn rejects_unsupported_yarn_command() {
+fn reports_unavailable_package_json_for_yarn_install_without_package() {
     assert_eq!(
         YarnManagerAdapter.parse_install(&args(&["install"])),
-        Err(ManagerAdapterError::UnsupportedCommand(
-            "install".to_owned()
+        Err(ManagerAdapterError::ManifestUnavailable(
+            "package.json".to_owned()
         ))
+    );
+}
+
+#[test]
+fn rejects_unsupported_yarn_command() {
+    assert_eq!(
+        YarnManagerAdapter.parse_install(&args(&["run"])),
+        Err(ManagerAdapterError::UnsupportedCommand("run".to_owned()))
     );
 }
