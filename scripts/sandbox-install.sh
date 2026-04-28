@@ -7,11 +7,11 @@ Usage:
   scripts/sandbox-install.sh [--allow-install] [--rebuild] <manager> <package-arg>...
 
 Examples:
-  scripts/sandbox-install.sh npm left-pad
-  scripts/sandbox-install.sh pnpm left-pad
-  scripts/sandbox-install.sh yarn left-pad
-  scripts/sandbox-install.sh --allow-install npm left-pad
-  scripts/sandbox-install.sh --rebuild npm left-pad
+  scripts/sandbox-install.sh npm is-number@7.0.0
+  scripts/sandbox-install.sh pnpm is-number@7.0.0
+  scripts/sandbox-install.sh yarn is-number@7.0.0
+  scripts/sandbox-install.sh --allow-install npm is-number@7.0.0
+  scripts/sandbox-install.sh --rebuild npm is-number@7.0.0
 
 Managers:
   npm                         Runs packvet npm install <package-arg>...

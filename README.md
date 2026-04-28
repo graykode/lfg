@@ -58,6 +58,25 @@ Color is enabled automatically on interactive terminals. Set
 `PACKVET_COLOR=never` to disable it, `PACKVET_COLOR=always` to force it, or
 `NO_COLOR=1` to disable color for tools that honor that convention.
 
+## Smoke Tests
+
+Use the local smoke test to run packvet in a temporary npm project with the
+local review provider:
+
+```bash
+scripts/smoke-local.sh
+```
+
+Use the Docker smoke test to verify the same install flow in a disposable
+container with a fake pass provider:
+
+```bash
+scripts/smoke-docker.sh
+```
+
+Both scripts default to the allowlisted package `is-number@7.0.0`, install with
+npm lifecycle scripts disabled, and run `npm audit --omit=dev` after install.
+
 Use `PACKVET_BYPASS=1` only as an emergency bypass:
 
 ```bash
