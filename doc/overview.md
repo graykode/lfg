@@ -39,6 +39,16 @@ previous published version -> target version
 If packvet cannot safely complete a required review, it returns `ask` instead
 of silently passing.
 
+## Supported Today
+
+packvet currently supports:
+
+- JavaScript and TypeScript packages from npm through npm, pnpm, and Yarn
+- Python packages from PyPI through pip and uv
+- Rust crates from crates.io through Cargo
+- Ruby gems from RubyGems through gem
+- local review with Claude Code CLI or Codex CLI
+
 ## Architecture
 
 ```text

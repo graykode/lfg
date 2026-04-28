@@ -7,12 +7,98 @@ or use `packvet review ...` when you only want the verdict. For guarded
 installs, packvet resolves the target release, reviews risky fresh releases,
 and then runs the real package manager, asks for confirmation, or blocks.
 
-## Works with
+## Supported today
 
-packvet currently supports local review through:
+Languages and package ecosystems:
 
-- Claude Code CLI (`claude`)
-- Codex CLI (`codex`)
+<table>
+  <thead>
+    <tr>
+      <th>Language</th>
+      <th>Package ecosystem</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>JavaScript / TypeScript</td>
+      <td>npm</td>
+    </tr>
+    <tr>
+      <td>Python</td>
+      <td>PyPI</td>
+    </tr>
+    <tr>
+      <td>Rust</td>
+      <td>crates.io</td>
+    </tr>
+    <tr>
+      <td>Ruby</td>
+      <td>RubyGems</td>
+    </tr>
+  </tbody>
+</table>
+
+Package managers:
+
+<table>
+  <thead>
+    <tr>
+      <th>Manager</th>
+      <th>Reviewed command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>npm</td>
+      <td><code>npm install</code>, <code>npm i</code></td>
+    </tr>
+    <tr>
+      <td>pnpm</td>
+      <td><code>pnpm add</code></td>
+    </tr>
+    <tr>
+      <td>Yarn</td>
+      <td><code>yarn add</code></td>
+    </tr>
+    <tr>
+      <td>pip</td>
+      <td><code>pip install</code></td>
+    </tr>
+    <tr>
+      <td>uv</td>
+      <td><code>uv add</code></td>
+    </tr>
+    <tr>
+      <td>Cargo</td>
+      <td><code>cargo add</code></td>
+    </tr>
+    <tr>
+      <td>gem</td>
+      <td><code>gem install</code></td>
+    </tr>
+  </tbody>
+</table>
+
+Review providers:
+
+<table>
+  <thead>
+    <tr>
+      <th>Provider</th>
+      <th>Command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Claude Code CLI</td>
+      <td><code>claude</code></td>
+    </tr>
+    <tr>
+      <td>Codex CLI</td>
+      <td><code>codex</code></td>
+    </tr>
+  </tbody>
+</table>
 
 Direct API-key review providers are not wired yet.
 
