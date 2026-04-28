@@ -101,6 +101,7 @@ where
                         PackageOutcome::ProviderReview(ProviderReviewOutcome {
                             package_name: releases.package_name.clone(),
                             version: releases.target.version.clone(),
+                            provider_id: self.provider.id().to_owned(),
                             verdict: review.verdict,
                             reason: review.reason,
                             log_path,

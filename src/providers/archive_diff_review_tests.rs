@@ -139,6 +139,7 @@ fn successful_archive_diff_returns_provider_verdict() {
         PackageOutcome::ProviderReview(ProviderReviewOutcome {
             package_name: "demo".to_owned(),
             version: "1.1.0".to_owned(),
+            provider_id: "static".to_owned(),
             verdict: Verdict::Block,
             reason: Some("added risky code".to_owned()),
             log_path: None,

@@ -514,7 +514,7 @@ fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
             style.pass("passed"),
             review.package_name,
             review.version,
-            style.label("reason:"),
+            style.label(&provider_reason_label(&review.provider_id)),
             reason,
             style.label("review log:"),
             style.log_path(&log_path)
@@ -522,6 +522,16 @@ fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
     }
 
     message
+}
+
+fn provider_reason_label(provider_id: &str) -> String {
+    let provider_name = match provider_id {
+        "claude" | "claude-cli" => "CLAUDE",
+        "codex" | "codex-cli" => "CODEX",
+        value => value,
+    };
+
+    format!("{provider_name}:")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -993,5 +1003,11 @@ mod tests {
             response.stderr,
             "packvet: review could not complete safely; install is paused.\n"
         );
+    }
+
+    #[test]
+    fn provider_reason_label_uses_configured_ai_name() {
+        assert_eq!(provider_reason_label("claude-cli"), "CLAUDE:");
+        assert_eq!(provider_reason_label("codex-cli"), "CODEX:");
     }
 }

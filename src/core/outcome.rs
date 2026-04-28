@@ -15,6 +15,7 @@ pub enum ReviewUnavailableReason {
 pub struct ProviderReviewOutcome {
     pub package_name: String,
     pub version: String,
+    pub provider_id: String,
     pub verdict: Verdict,
     pub reason: Option<String>,
     pub log_path: Option<PathBuf>,
@@ -127,6 +128,7 @@ mod tests {
             aggregate_verdicts(&[PackageOutcome::ProviderReview(ProviderReviewOutcome {
                 package_name: "demo".to_owned(),
                 version: "1.0.0".to_owned(),
+                provider_id: "claude-cli".to_owned(),
                 verdict: Verdict::Ask,
                 reason: Some("uncertain".to_owned()),
                 log_path: None,
@@ -157,6 +159,7 @@ mod tests {
             aggregate_verdicts(&[PackageOutcome::ProviderReview(ProviderReviewOutcome {
                 package_name: "demo".to_owned(),
                 version: "1.0.0".to_owned(),
+                provider_id: "claude-cli".to_owned(),
                 verdict: Verdict::Block,
                 reason: Some("risky".to_owned()),
                 log_path: None,
