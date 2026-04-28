@@ -48,7 +48,16 @@ fn explicit_old_npm_install_executes_real_npm_after_policy_pass() {
         "fake npm stdout\n"
     );
     let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
-    assert_eq!(stderr, "fake npm stderr\n");
+    assert_eq!(
+        stderr,
+        "\
+packvet: checking npm install old-package
+packvet: resolving npm metadata for old-package
+packvet: skipped review for old-package; older than configured threshold
+packvet: running npm install old-package
+fake npm stderr
+"
+    );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
         "install\nold-package\n"

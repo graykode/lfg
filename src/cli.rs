@@ -14,8 +14,9 @@ use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor
 use crate::core::{
     InstallOperation, InstallRequest, ManagerAdapterError, ManagerIntegrationAdapter, RealCommand,
 };
+use crate::core::{ReleaseReviewer, ResolvedPackageReleases, SkipReason};
 use crate::evidence::{HttpArchiveFetcher, UnifiedDiffEngine};
-use crate::providers::ArchiveDiffReviewer;
+use crate::providers::{ArchiveDiffReviewer, ProviderError, ReviewPrompt, ReviewProvider};
 use crate::shims::{
     install_shim, parse_shim_command, uninstall_shim, ShimCommand, ShimCommandError, ShimSetupError,
 };
@@ -36,6 +37,41 @@ pub enum AskConfirmation {
 
 pub trait AskConfirmer {
     fn confirm(&mut self, prompt: &str) -> AskConfirmation;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ManagerRunMode {
+    InstallGuard,
+    ReviewOnly,
+}
+
+trait ProgressReporter {
+    fn report(&self, output: &str);
+
+    fn is_immediate(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NoopProgressReporter;
+
+impl ProgressReporter for NoopProgressReporter {
+    fn report(&self, _output: &str) {}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StdioProgressReporter;
+
+impl ProgressReporter for StdioProgressReporter {
+    fn report(&self, output: &str) {
+        let mut stderr = io::stderr().lock();
+        let _ = write!(stderr, "{output}").and_then(|_| stderr.flush());
+    }
+
+    fn is_immediate(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,17 +114,20 @@ impl AskConfirmer for StdioAskConfirmer {
 
 pub fn run(args: impl IntoIterator<Item = String>) -> CliResponse {
     let mut confirmer = NonInteractiveAskConfirmer;
-    run_with_ask_confirmer(args, &mut confirmer)
+    let reporter = NoopProgressReporter;
+    run_with_ask_confirmer(args, &mut confirmer, &reporter)
 }
 
 pub fn run_interactive(args: impl IntoIterator<Item = String>) -> CliResponse {
     let mut confirmer = StdioAskConfirmer;
-    run_with_ask_confirmer(args, &mut confirmer)
+    let reporter = StdioProgressReporter;
+    run_with_ask_confirmer(args, &mut confirmer, &reporter)
 }
 
 fn run_with_ask_confirmer(
     args: impl IntoIterator<Item = String>,
     confirmer: &mut dyn AskConfirmer,
+    reporter: &dyn ProgressReporter,
 ) -> CliResponse {
     let mut args = args.into_iter();
     let program = args.next().unwrap_or_default();
@@ -100,6 +139,8 @@ fn run_with_ask_confirmer(
             args.collect(),
             invocation_program_path,
             confirmer,
+            reporter,
+            ManagerRunMode::InstallGuard,
         );
     }
 
@@ -120,11 +161,16 @@ fn run_with_ask_confirmer(
             stderr: String::new(),
         },
         Some(argument) if argument == "shim" => run_shim_command(args.collect()),
+        Some(argument) if argument == "review" => {
+            run_review_command(args.collect(), invocation_program_path, reporter)
+        }
         Some(argument) => run_manager(
             &argument,
             args.collect(),
             invocation_program_path,
             confirmer,
+            reporter,
+            ManagerRunMode::InstallGuard,
         ),
     }
 }
@@ -143,6 +189,8 @@ fn run_manager(
     args: Vec<String>,
     invocation_program_path: PathBuf,
     confirmer: &mut dyn AskConfirmer,
+    reporter: &dyn ProgressReporter,
+    mode: ManagerRunMode,
 ) -> CliResponse {
     let registry = match built_in_manager_adapters() {
         Ok(registry) => registry,
@@ -153,7 +201,7 @@ fn run_manager(
         Err(_) => return unknown_argument_response(manager_id),
     };
 
-    if bypass_requested() {
+    if mode == ManagerRunMode::InstallGuard && bypass_requested() {
         return execute_manager_args(adapter.id(), args, invocation_program_path);
     }
 
@@ -163,9 +211,36 @@ fn run_manager(
             request,
             invocation_program_path,
             confirmer,
+            reporter,
+            mode,
         ),
         Err(error) => manager_parse_error_response(manager_id, error),
     }
+}
+
+fn run_review_command(
+    args: Vec<String>,
+    invocation_program_path: PathBuf,
+    reporter: &dyn ProgressReporter,
+) -> CliResponse {
+    let mut args = args.into_iter();
+    let Some(manager_id) = args.next() else {
+        return CliResponse {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: "packvet: review manager is required\n".to_owned(),
+        };
+    };
+
+    let mut confirmer = NonInteractiveAskConfirmer;
+    run_manager(
+        &manager_id,
+        args.collect(),
+        invocation_program_path,
+        &mut confirmer,
+        reporter,
+        ManagerRunMode::ReviewOnly,
+    )
 }
 
 fn bypass_requested() -> bool {
@@ -273,12 +348,60 @@ fn shim_setup_error_response(error: ShimSetupError) -> CliResponse {
     }
 }
 
+struct ProgressReviewProvider<'a, P> {
+    inner: P,
+    reporter: &'a dyn ProgressReporter,
+}
+
+impl<P> ReviewProvider for ProgressReviewProvider<'_, P>
+where
+    P: ReviewProvider,
+{
+    fn id(&self) -> &'static str {
+        self.inner.id()
+    }
+
+    fn review(&self, prompt: &ReviewPrompt) -> Result<String, ProviderError> {
+        let provider_id = self.inner.id();
+        if provider_id == "unavailable" {
+            self.reporter
+                .report("packvet: review provider unavailable\n");
+        } else {
+            self.reporter
+                .report(&format!("packvet: reviewing diff with {provider_id}\n"));
+        }
+        self.inner.review(prompt)
+    }
+}
+
+struct ProgressReleaseReviewer<'a, V> {
+    inner: V,
+    reporter: &'a dyn ProgressReporter,
+}
+
+impl<V> ReleaseReviewer for ProgressReleaseReviewer<'_, V>
+where
+    V: ReleaseReviewer,
+{
+    fn review(&self, releases: &ResolvedPackageReleases) -> PackageOutcome {
+        self.reporter.report(&format!(
+            "packvet: preparing diff for {} {} -> {}\n",
+            releases.package_name, releases.previous.version, releases.target.version
+        ));
+        self.inner.review(releases)
+    }
+}
+
 fn evaluate_manager_request(
     adapter: &dyn ManagerIntegrationAdapter,
     request: InstallRequest,
     invocation_program_path: PathBuf,
     confirmer: &mut dyn AskConfirmer,
+    reporter: &dyn ProgressReporter,
+    mode: ManagerRunMode,
 ) -> CliResponse {
+    report_checking_request(adapter.id(), &request, reporter);
+
     let resolver_registry = match built_in_release_resolvers(AdapterConfig::from_env()) {
         Ok(registry) => registry,
         Err(_) => return resolver_unavailable_response(adapter.id()),
@@ -301,9 +424,19 @@ fn evaluate_manager_request(
         Err(_) => return evaluator_unavailable_response(adapter.id()),
     };
 
+    report_resolving_targets(adapter.id(), &request, reporter);
+
     let provider = built_in_review_provider(&PathProgramDetector);
+    let provider = ProgressReviewProvider {
+        inner: provider,
+        reporter,
+    };
     let reviewer =
         ArchiveDiffReviewer::with_provider(HttpArchiveFetcher, UnifiedDiffEngine, provider);
+    let reviewer = ProgressReleaseReviewer {
+        inner: reviewer,
+        reporter,
+    };
     let outcomes = evaluate_install_request_with_reviewer(
         &request,
         resolver.as_ref(),
@@ -311,19 +444,53 @@ fn evaluate_manager_request(
         &reviewer,
         current_time(),
     );
+    report_policy_progress_messages(&request, &outcomes, reporter);
     let verdict = aggregate_verdicts(&outcomes);
     if verdict == Verdict::Pass {
+        let pass_messages = provider_pass_messages(&outcomes);
+        reporter.report(&pass_messages);
+        if mode == ManagerRunMode::ReviewOnly {
+            let message = review_completed_message(adapter.id(), request.operation);
+            if reporter.is_immediate() {
+                reporter.report(&message);
+                return CliResponse {
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                };
+            }
+
+            return CliResponse {
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: format!("{pass_messages}{message}"),
+            };
+        }
+
+        report_running_manager(adapter.id(), &request, reporter);
+
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
         let mut response = execute_manager_request(adapter, &request, &executor);
-        response.stderr = format!("{}{}", provider_pass_messages(&outcomes), response.stderr);
+        if !reporter.is_immediate() {
+            response.stderr = format!("{pass_messages}{}", response.stderr);
+        }
         return response;
     }
 
     if verdict == Verdict::Ask {
         let operation = operation_label(request.operation);
         let ask_message = ask_message(adapter.id(), operation, &outcomes);
+        if mode == ManagerRunMode::ReviewOnly {
+            return CliResponse {
+                exit_code: Verdict::Ask.exit_code(),
+                stdout: String::new(),
+                stderr: ask_message,
+            };
+        }
+
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
         return confirm_install(adapter.id(), operation, ask_message, confirmer, || {
+            report_running_manager(adapter.id(), &request, reporter);
             execute_manager_request(adapter, &request, &executor)
         });
     }
@@ -335,6 +502,12 @@ fn evaluate_manager_request(
         stdout: String::new(),
         stderr,
     }
+}
+
+fn review_completed_message(manager_id: &str, operation: InstallOperation) -> String {
+    let operation = operation_label(operation);
+
+    format!("packvet: review completed for {manager_id} {operation}. install was not executed.\n")
 }
 
 fn confirm_install<F>(
@@ -372,6 +545,67 @@ fn execute_manager_request(
     let command = adapter.real_command(request);
 
     execute_real_command(adapter.id(), command, executor)
+}
+
+fn report_checking_request(
+    manager_id: &str,
+    request: &InstallRequest,
+    reporter: &dyn ProgressReporter,
+) {
+    reporter.report(&format!(
+        "packvet: checking {}\n",
+        manager_command_line(manager_id, &request.manager_args)
+    ));
+}
+
+fn report_resolving_targets(
+    manager_id: &str,
+    request: &InstallRequest,
+    reporter: &dyn ProgressReporter,
+) {
+    for target in &request.targets {
+        reporter.report(&format!(
+            "packvet: resolving {manager_id} metadata for {}\n",
+            target.spec
+        ));
+    }
+}
+
+fn report_policy_progress_messages(
+    request: &InstallRequest,
+    outcomes: &[PackageOutcome],
+    reporter: &dyn ProgressReporter,
+) {
+    for (target, outcome) in request.targets.iter().zip(outcomes) {
+        if matches!(
+            outcome,
+            PackageOutcome::Skipped(SkipReason::OlderThanThreshold)
+        ) {
+            reporter.report(&format!(
+                "packvet: skipped review for {}; older than configured threshold\n",
+                target.spec
+            ));
+        }
+    }
+}
+
+fn report_running_manager(
+    manager_id: &str,
+    request: &InstallRequest,
+    reporter: &dyn ProgressReporter,
+) {
+    reporter.report(&format!(
+        "packvet: running {}\n",
+        manager_command_line(manager_id, &request.manager_args)
+    ));
+}
+
+fn manager_command_line(manager_id: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        return manager_id.to_owned();
+    }
+
+    format!("{manager_id} {}", args.join(" "))
 }
 
 fn provider_pass_messages(outcomes: &[PackageOutcome]) -> String {
@@ -706,6 +940,7 @@ fn help_text() -> String {
 packvet is a local pre-install guard for package managers.
 
 Usage: packvet [OPTIONS] [MANAGER] [ARGS]
+       packvet review <MANAGER> [ARGS]
        packvet shim install --dir <DIR> <MANAGER>
        packvet shim uninstall --dir <DIR> <MANAGER>
 
@@ -714,6 +949,7 @@ Options:
   -V, --version    Print version
 
 Examples:
+  packvet review npm install <package>
   packvet cargo add <crate>
   packvet gem install <gem>
   packvet npm install <package>

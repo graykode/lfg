@@ -36,7 +36,13 @@ fn shim_npm_install_detects_manager_from_argv0_and_skips_shim_for_real_npm() {
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake npm stderr\n"
+        "\
+packvet: checking npm install recent-package
+packvet: resolving npm metadata for recent-package
+packvet: skipped review for recent-package; older than configured threshold
+packvet: running npm install recent-package
+fake npm stderr
+"
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
@@ -157,7 +163,13 @@ fn shim_npm_install_returns_ask_when_real_npm_is_missing() {
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "packvet: npm executable is unavailable; install is paused.\n"
+        "\
+packvet: checking npm install recent-package
+packvet: resolving npm metadata for recent-package
+packvet: skipped review for recent-package; older than configured threshold
+packvet: running npm install recent-package
+packvet: npm executable is unavailable; install is paused.
+"
     );
 
     let requests = server.join().expect("server thread completes");

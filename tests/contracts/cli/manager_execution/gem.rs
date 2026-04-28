@@ -43,7 +43,13 @@ fn explicit_old_gem_install_executes_real_gem_after_policy_pass() {
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake gem stderr\n"
+        "\
+packvet: checking gem install rack
+packvet: resolving gem metadata for rack
+packvet: skipped review for rack; older than configured threshold
+packvet: running gem install rack
+fake gem stderr
+"
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake gem args are captured"),

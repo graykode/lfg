@@ -34,7 +34,16 @@ fn explicit_old_pip_install_executes_real_pip_after_policy_pass() {
         "fake pip stdout\n"
     );
     let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
-    assert_eq!(stderr, "fake pip stderr\n");
+    assert_eq!(
+        stderr,
+        "\
+packvet: checking pip install old-python-package
+packvet: resolving pip metadata for old-python-package
+packvet: skipped review for old-python-package; older than configured threshold
+packvet: running pip install old-python-package
+fake pip stderr
+"
+    );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake pip args are captured"),
         "install\nold-python-package\n"

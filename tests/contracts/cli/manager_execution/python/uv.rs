@@ -33,7 +33,16 @@ fn explicit_old_uv_add_executes_real_uv_after_policy_pass() {
         "fake uv stdout\n"
     );
     let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
-    assert_eq!(stderr, "fake uv stderr\n");
+    assert_eq!(
+        stderr,
+        "\
+packvet: checking uv add old-python-package
+packvet: resolving uv metadata for old-python-package
+packvet: skipped review for old-python-package; older than configured threshold
+packvet: running uv add old-python-package
+fake uv stderr
+"
+    );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake uv args are captured"),
         "add\nold-python-package\n"

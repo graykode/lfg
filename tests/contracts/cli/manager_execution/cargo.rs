@@ -48,7 +48,13 @@ fn explicit_old_cargo_add_executes_real_cargo_after_policy_pass() {
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake cargo stderr\n"
+        "\
+packvet: checking cargo add serde
+packvet: resolving cargo metadata for serde
+packvet: skipped review for serde; older than configured threshold
+packvet: running cargo add serde
+fake cargo stderr
+"
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake cargo args are captured"),

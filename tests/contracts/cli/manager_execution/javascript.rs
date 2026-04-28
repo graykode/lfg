@@ -50,7 +50,13 @@ fn explicit_old_pnpm_add_executes_real_pnpm_after_policy_pass() {
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake pnpm stderr\n"
+        "\
+packvet: checking pnpm add old-package
+packvet: resolving pnpm metadata for old-package
+packvet: skipped review for old-package; older than configured threshold
+packvet: running pnpm add old-package
+fake pnpm stderr
+"
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake pnpm args are captured"),
@@ -91,7 +97,13 @@ fn explicit_old_yarn_add_executes_real_yarn_after_policy_pass() {
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "fake yarn stderr\n"
+        "\
+packvet: checking yarn add old-package
+packvet: resolving yarn metadata for old-package
+packvet: skipped review for old-package; older than configured threshold
+packvet: running yarn add old-package
+fake yarn stderr
+"
     );
     assert_eq!(
         fs::read_to_string(&fake_args_path).expect("fake yarn args are captured"),

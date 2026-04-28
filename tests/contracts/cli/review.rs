@@ -4,7 +4,7 @@ use super::support::{
     path_with_fake_bin, run_packvet_with_crates_io_registry_now_and_env,
     run_packvet_with_pypi_registry_now_and_env, run_packvet_with_registry_and_now,
     run_packvet_with_registry_now_and_env, run_packvet_with_rubygems_registry_now_and_env,
-    serve_recent_crate_with_archives, serve_recent_gem_with_archives,
+    serve_packument_once, serve_recent_crate_with_archives, serve_recent_gem_with_archives,
     serve_recent_package_with_archives, serve_recent_python_project_with_archives, temp_test_dir,
     write_fake_claude_bin, write_fake_npm_bin,
 };
@@ -19,7 +19,7 @@ fn explicit_recent_npm_install_fetches_metadata_and_pauses_for_diff_review() {
         25 * 60 * 60,
     );
 
-    assert_recent_review_pause(output, "npm", "install");
+    assert_recent_review_pause(output, "npm", "install", "recent-package");
 
     let requests = server.join().expect("server thread completes");
     assert_recent_npm_archive_requests(&requests);
@@ -35,7 +35,7 @@ fn explicit_recent_pnpm_add_fetches_metadata_and_pauses_for_diff_review() {
         25 * 60 * 60,
     );
 
-    assert_recent_review_pause(output, "pnpm", "add");
+    assert_recent_review_pause(output, "pnpm", "add", "recent-package");
 
     let requests = server.join().expect("server thread completes");
     assert_recent_npm_archive_requests(&requests);
@@ -51,7 +51,7 @@ fn explicit_recent_yarn_add_fetches_metadata_and_pauses_for_diff_review() {
         25 * 60 * 60,
     );
 
-    assert_recent_review_pause(output, "yarn", "add");
+    assert_recent_review_pause(output, "yarn", "add", "recent-package");
 
     let requests = server.join().expect("server thread completes");
     assert_recent_npm_archive_requests(&requests);
@@ -68,7 +68,7 @@ fn explicit_recent_pip_install_fetches_metadata_and_pauses_for_diff_review() {
         &[],
     );
 
-    assert_recent_review_pause(output, "pip", "install");
+    assert_recent_review_pause(output, "pip", "install", "recent-python-package");
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
@@ -92,7 +92,7 @@ fn explicit_recent_uv_add_fetches_metadata_and_pauses_for_diff_review() {
         &[],
     );
 
-    assert_recent_review_pause(output, "uv", "add");
+    assert_recent_review_pause(output, "uv", "add", "recent-python-package");
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
@@ -116,7 +116,7 @@ fn explicit_recent_cargo_add_fetches_metadata_and_pauses_for_diff_review() {
         &[],
     );
 
-    assert_recent_review_pause(output, "cargo", "add");
+    assert_recent_review_pause(output, "cargo", "add", "recent-crate");
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
@@ -138,7 +138,7 @@ fn explicit_recent_gem_install_fetches_metadata_and_pauses_for_diff_review() {
         &[],
     );
 
-    assert_recent_review_pause(output, "gem", "install");
+    assert_recent_review_pause(output, "gem", "install", "recent-gem");
 
     let requests = server.join().expect("server thread completes");
     assert_eq!(requests.len(), 3);
@@ -149,6 +149,123 @@ fn explicit_recent_gem_install_fetches_metadata_and_pauses_for_diff_review() {
     assert!(requests
         .iter()
         .any(|request| request.starts_with("GET /gems/recent-gem-1.1.0.gem HTTP/1.1\r\n")));
+}
+
+#[test]
+fn review_old_npm_install_does_not_execute_real_npm_after_policy_pass() {
+    let packument = r#"{
+      "name": "old-package",
+      "dist-tags": { "latest": "1.1.0" },
+      "time": {
+        "1.0.0": "1970-01-01T00:00:00.000Z",
+        "1.1.0": "1970-01-02T00:00:00.000Z"
+      },
+      "versions": {
+        "1.0.0": {
+          "dist": { "tarball": "https://registry.npmjs.org/old-package/-/old-package-1.0.0.tgz" }
+        },
+        "1.1.0": {
+          "dist": { "tarball": "https://registry.npmjs.org/old-package/-/old-package-1.1.0.tgz" }
+        }
+      }
+    }"#;
+    let (registry_base_url, server) = serve_packument_once(packument);
+    let temp_dir = temp_test_dir("packvet-review-fake-npm");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    write_fake_npm_bin(&fake_bin_dir);
+
+    let output = run_packvet_with_registry_now_and_env(
+        &["review", "npm", "install", "old-package"],
+        &registry_base_url,
+        50 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            (
+                "PACKVET_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("stderr is utf-8"),
+        "\
+packvet: checking npm install old-package
+packvet: resolving npm metadata for old-package
+packvet: skipped review for old-package; older than configured threshold
+packvet: review completed for npm install. install was not executed.
+"
+    );
+    assert!(!fake_args_path.exists());
+
+    let request = server.join().expect("server thread completes");
+    assert!(request.starts_with("GET /old-package HTTP/1.1\r\n"));
+
+    fs::remove_dir_all(temp_dir).expect("remove review fake npm temp dir");
+}
+
+#[test]
+fn review_recent_npm_install_does_not_execute_real_npm_after_provider_pass() {
+    let (registry_base_url, server) = serve_recent_package_with_archives();
+    let temp_dir = temp_test_dir("packvet-review-fake-provider-pass");
+    let fake_bin_dir = temp_dir.join("bin");
+    let fake_args_path = temp_dir.join("npm-args.txt");
+    let fake_prompt_path = temp_dir.join("provider-prompt.txt");
+    let review_log_dir = temp_dir.join("reviews");
+    write_fake_npm_bin(&fake_bin_dir);
+    write_fake_claude_bin(
+        &fake_bin_dir,
+        "verdict: pass\nreason: fixture allowed\n\nevidence:\n- package/index.js: fixture signal\n",
+    );
+
+    let output = run_packvet_with_registry_now_and_env(
+        &["review", "npm", "install", "recent-package"],
+        &registry_base_url,
+        25 * 60 * 60,
+        &[
+            ("PATH", path_with_fake_bin(&fake_bin_dir)),
+            ("PACKVET_REVIEW_PROVIDER", "claude".to_owned()),
+            (
+                "PACKVET_FAKE_NPM_ARGS",
+                fake_args_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "PACKVET_FAKE_PROVIDER_PROMPT",
+                fake_prompt_path.to_string_lossy().into_owned(),
+            ),
+            (
+                "PACKVET_REVIEW_LOG_DIR",
+                review_log_dir.to_string_lossy().into_owned(),
+            ),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("stderr is utf-8");
+    assert!(stderr.contains("packvet: checking npm install recent-package\n"));
+    assert!(stderr.contains("packvet: resolving npm metadata for recent-package\n"));
+    assert!(stderr.contains("packvet: preparing diff for recent-package 1.0.0 -> 1.1.0\n"));
+    assert!(stderr.contains("packvet: reviewing diff with claude-cli\n"));
+    assert!(stderr.contains("packvet: review passed for recent-package 1.1.0\n"));
+    assert!(stderr.contains("packvet: reason: fixture allowed\n"));
+    assert!(
+        stderr.ends_with("packvet: review completed for npm install. install was not executed.\n")
+    );
+    assert!(!stderr.contains("fake npm stderr"));
+    assert!(!fake_args_path.exists());
+
+    let prompt = fs::read_to_string(&fake_prompt_path).expect("provider prompt is captured");
+    assert!(prompt.contains("package: recent-package"));
+    assert!(prompt.contains("+module.exports = 2;"));
+
+    let requests = server.join().expect("server thread completes");
+    assert_eq!(requests.len(), 3);
+
+    fs::remove_dir_all(temp_dir).expect("remove review fake provider temp dir");
 }
 
 #[test]
@@ -196,7 +313,7 @@ fn explicit_recent_npm_install_logs_review_and_executes_real_npm_after_provider_
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
         format!(
-            "packvet: review \u{1b}[32mpassed\u{1b}[0m for recent-package 1.1.0\npackvet: \u{1b}[1mreason:\u{1b}[0m fixture allowed\npackvet: \u{1b}[1mreview log:\u{1b}[0m \u{1b}[36;4m{}\u{1b}[0m\nfake npm stderr\n",
+            "packvet: checking npm install recent-package\npackvet: resolving npm metadata for recent-package\npackvet: preparing diff for recent-package 1.0.0 -> 1.1.0\npackvet: reviewing diff with claude-cli\npackvet: review \u{1b}[32mpassed\u{1b}[0m for recent-package 1.1.0\npackvet: \u{1b}[1mreason:\u{1b}[0m fixture allowed\npackvet: \u{1b}[1mreview log:\u{1b}[0m \u{1b}[36;4m{}\u{1b}[0m\npackvet: running npm install recent-package\nfake npm stderr\n",
             review_log_dir.join("reviews.jsonl").display()
         )
     );
@@ -263,7 +380,13 @@ fn explicit_recent_npm_install_does_not_execute_real_npm_after_provider_block() 
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "packvet: npm install was blocked by provider review.\n"
+        "\
+packvet: checking npm install recent-package
+packvet: resolving npm metadata for recent-package
+packvet: preparing diff for recent-package 1.0.0 -> 1.1.0
+packvet: reviewing diff with claude-cli
+packvet: npm install was blocked by provider review.
+"
     );
     assert!(!fake_args_path.exists());
     let prompt = fs::read_to_string(&fake_prompt_path).expect("provider prompt is captured");
@@ -360,7 +483,13 @@ fn explicit_npm_install_uses_configured_review_age_threshold() {
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "packvet: review required for npm install, but provider review is not wired yet. install is paused.\n"
+        "\
+packvet: checking npm install recent-package
+packvet: resolving npm metadata for recent-package
+packvet: preparing diff for recent-package 1.0.0 -> 1.1.0
+packvet: review provider unavailable
+packvet: review required for npm install, but provider review is not wired yet. install is paused.
+"
     );
     assert!(!fake_args_path.exists());
 
@@ -370,13 +499,18 @@ fn explicit_npm_install_uses_configured_review_age_threshold() {
     fs::remove_dir_all(temp_dir).expect("remove fake threshold temp dir");
 }
 
-fn assert_recent_review_pause(output: std::process::Output, manager: &str, operation: &str) {
+fn assert_recent_review_pause(
+    output: std::process::Output,
+    manager: &str,
+    operation: &str,
+    target: &str,
+) {
     assert_eq!(output.status.code(), Some(20));
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
         format!(
-            "packvet: review required for {manager} {operation}, but provider review is not wired yet. install is paused.\n"
+            "packvet: checking {manager} {operation} {target}\npackvet: resolving {manager} metadata for {target}\npackvet: preparing diff for {target} 1.0.0 -> 1.1.0\npackvet: review provider unavailable\npackvet: review required for {manager} {operation}, but provider review is not wired yet. install is paused.\n"
         )
     );
 }

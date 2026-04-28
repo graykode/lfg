@@ -74,6 +74,7 @@ impl PathCommandLocator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessCommandExecutor {
     locator: PathCommandLocator,
+    stream_stdio: bool,
 }
 
 impl ProcessCommandExecutor {
@@ -85,6 +86,7 @@ impl ProcessCommandExecutor {
 
         Self {
             locator: PathCommandLocator::from_env(skip_paths),
+            stream_stdio: true,
         }
     }
 }
@@ -106,6 +108,25 @@ impl CommandExecutor for ProcessCommandExecutor {
             .locator
             .resolve(&command.program)
             .ok_or_else(|| CommandExecutionError::Unavailable(command.program.clone()))?;
+
+        if self.stream_stdio {
+            let status = Command::new(program)
+                .args(&command.args)
+                .status()
+                .map_err(|error| {
+                    if error.kind() == std::io::ErrorKind::NotFound {
+                        CommandExecutionError::Unavailable(error.to_string())
+                    } else {
+                        CommandExecutionError::Failed(error.to_string())
+                    }
+                })?;
+
+            return Ok(CommandOutput {
+                exit_code: status.code().unwrap_or(1),
+                stdout: String::new(),
+                stderr: String::new(),
+            });
+        }
 
         let output = Command::new(program)
             .args(&command.args)
