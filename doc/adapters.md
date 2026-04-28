@@ -64,7 +64,7 @@ Responsibilities:
 
 Examples:
 
-- npm, pnpm, and yarn can share an npm registry resolver.
+- Bun, npm, pnpm, and yarn can share an npm registry resolver.
 - pip and uv can share a PyPI resolver.
 - cargo can use a crates.io resolver.
 - gem can use a RubyGems resolver.
@@ -147,6 +147,12 @@ The manager adapter must still fail to `ask` for resolution-affecting
 options it cannot safely understand. It should not fetch registry metadata,
 build diffs, call providers, parse final verdicts, or execute the real
 package manager itself.
+
+JavaScript managers may share `package.json` dependency extraction for bare
+install commands. That helper is still part of the manager boundary: it turns
+local CLI context into install targets, but it must not fetch registry
+metadata, read lockfiles as authoritative resolution, build diffs, or decide
+policy.
 
 ## Future External Adapter Protocol
 

@@ -122,6 +122,7 @@ Targets:
 
 | Manager | Ecosystem resolver | Primary integration |
 |---|---|---|
+| `bun` | npm registry | explicit wrapper |
 | `pnpm` | npm registry | explicit wrapper |
 | `yarn` | npm registry | explicit wrapper |
 | `cargo` | crates.io | explicit wrapper |

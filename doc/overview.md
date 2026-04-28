@@ -43,11 +43,15 @@ of silently passing.
 
 packvet currently supports:
 
-- JavaScript and TypeScript packages from npm through npm, pnpm, and Yarn
+- JavaScript and TypeScript packages from npm through Bun, npm, pnpm, and Yarn
 - Python packages from PyPI through pip and uv
 - Rust crates from crates.io through Cargo
 - Ruby gems from RubyGems through gem
 - local review with Claude Code CLI or Codex CLI
+
+For JavaScript package managers, explicit package arguments are reviewed
+directly. Bare install commands read registry dependencies from `package.json`;
+lockfile-aware exact resolution is not wired yet.
 
 ## Architecture
 

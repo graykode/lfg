@@ -63,9 +63,12 @@ src/
   ecosystems/rubygems/
                      RubyGems metadata and Ruby release policy glue
   evidence/          archive reading, archive fetching, source diff creation
+  managers/bun/      Bun CLI parsing
   managers/cargo/    cargo CLI parsing
   managers/gem/      gem CLI parsing
   managers/npm/      npm CLI parsing
+  managers/package_json.rs
+                     package.json dependency extraction shared by JS managers
   managers/pip/      pip CLI parsing
   managers/pnpm/     pnpm CLI parsing
   managers/uv/       uv CLI parsing
@@ -102,15 +105,24 @@ The parser turns manager-specific commands into normalized install plans.
 
 Examples:
 
+- `bun add left-pad`
 - `npm i left-pad`
 - `npm install left-pad@1.3.0`
+- `pnpm install`
 - `pip install requests==2.32.3`
+- `uv pip install -r requirements.txt`
 - `uv add requests`
 
 An install plan can contain multiple package requests. For example,
 requirements files and workspace commands may expand to many packages.
 If packvet cannot confidently understand the install target, it returns `ask`
 instead of silently passing.
+
+For JavaScript package managers, bare install commands may read dependencies
+from `package.json`. The parser only extracts registry dependencies; local,
+workspace, and remote URL dependencies are skipped or returned as `ask` when
+they cannot be reviewed through registry metadata. Lockfile-aware exact version
+resolution is a future resolver concern, not manager adapter logic.
 
 ## Manager Integration Adapter
 
@@ -182,7 +194,7 @@ The gate is the only component that may execute the real package manager.
 ## Dependency Direction
 
 ```text
-Shim / CLI
+CLI Entrypoint
   -> Core Orchestrator
       -> Manager Integration Registry
       -> Ecosystem Resolver Registry

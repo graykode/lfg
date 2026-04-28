@@ -18,8 +18,8 @@ Keep it short. Put durable product detail in `doc/`.
 Work on **post-milestone review and hardening**.
 
 Milestones 1-5 have implementation coverage. Before adding new feature
-scope, review manager/ecosystem boundaries, fail-to-ask behavior, and
-archive support gaps such as Ruby `.gem` source extraction.
+scope, review manager/ecosystem boundaries, fail-to-ask behavior,
+manifest-derived install targets, and archive support regressions.
 
 ## Non-Negotiables
 
