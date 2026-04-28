@@ -48,12 +48,6 @@ pub fn aggregate_verdicts(outcomes: &[PackageOutcome]) -> Verdict {
     }
 }
 
-pub fn has_provider_pass(outcomes: &[PackageOutcome]) -> bool {
-    outcomes
-        .iter()
-        .any(|outcome| matches!(outcome, PackageOutcome::ProviderVerdict(Verdict::Pass)))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,16 +109,6 @@ mod tests {
         let verdict = aggregate_verdicts(&[PackageOutcome::ProviderVerdict(Verdict::Block)]);
 
         assert_eq!(verdict, Verdict::Block);
-    }
-
-    #[test]
-    fn detects_provider_pass_outcome() {
-        assert!(has_provider_pass(&[PackageOutcome::ProviderVerdict(
-            Verdict::Pass
-        )]));
-        assert!(!has_provider_pass(&[PackageOutcome::Skipped(
-            SkipReason::OlderThanThreshold
-        )]));
     }
 
     #[test]

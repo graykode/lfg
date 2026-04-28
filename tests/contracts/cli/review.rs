@@ -152,7 +152,7 @@ fn explicit_recent_gem_install_fetches_metadata_and_pauses_for_diff_review() {
 }
 
 #[test]
-fn explicit_recent_npm_install_logs_review_and_asks_before_provider_pass_execution() {
+fn explicit_recent_npm_install_logs_review_and_executes_real_npm_after_provider_pass() {
     let (registry_base_url, server) = serve_recent_package_with_archives();
     let temp_dir = temp_test_dir("packvet-fake-provider-pass");
     let fake_bin_dir = temp_dir.join("bin");
@@ -187,13 +187,19 @@ fn explicit_recent_npm_install_logs_review_and_asks_before_provider_pass_executi
         ],
     );
 
-    assert_eq!(output.status.code(), Some(20));
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout is utf-8"),
+        "fake npm stdout\n"
+    );
     assert_eq!(
         String::from_utf8(output.stderr).expect("stderr is utf-8"),
-        "packvet: provider passed npm install. install is paused.\n"
+        "fake npm stderr\n"
     );
-    assert!(!fake_args_path.exists());
+    assert_eq!(
+        fs::read_to_string(&fake_args_path).expect("fake npm args are captured"),
+        "install\nrecent-package\n"
+    );
     let prompt = fs::read_to_string(&fake_prompt_path).expect("provider prompt is captured");
     assert!(prompt.contains("package: recent-package"));
     assert!(prompt.contains("previous version: 1.0.0"));

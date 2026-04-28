@@ -8,7 +8,7 @@ use crate::builtins::{
     built_in_review_provider, AdapterConfig, PathProgramDetector, PolicyConfig,
 };
 use crate::core::Verdict;
-use crate::core::{aggregate_verdicts, has_provider_pass, PackageOutcome, ReviewUnavailableReason};
+use crate::core::{aggregate_verdicts, PackageOutcome, ReviewUnavailableReason};
 use crate::core::{evaluate_install_request_with_reviewer, AskReason};
 use crate::core::{CommandExecutionError, CommandExecutor, ProcessCommandExecutor};
 use crate::core::{
@@ -314,18 +314,6 @@ fn evaluate_manager_request(
     let verdict = aggregate_verdicts(&outcomes);
     if verdict == Verdict::Pass {
         let executor = ProcessCommandExecutor::for_invocation(invocation_program_path);
-        if has_provider_pass(&outcomes) {
-            let operation = operation_label(request.operation);
-            let pass_message = format!(
-                "packvet: provider passed {} {}. install is paused.\n",
-                adapter.id(),
-                operation
-            );
-            return confirm_install(adapter.id(), operation, pass_message, confirmer, || {
-                execute_manager_request(adapter, &request, &executor)
-            });
-        }
-
         return execute_manager_request(adapter, &request, &executor);
     }
 
